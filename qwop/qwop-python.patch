@@ -22,6 +22,43 @@ index f290afd..adfa737 100644
    exploration_initial_eps: 1
    exploration_final_eps: 0.01
  
+diff --git a/config/train_qrdqn_10m.yml b/config/train_qrdqn_10m.yml
+new file mode 100644
+index 0000000..229feca
+--- /dev/null
++++ b/config/train_qrdqn_10m.yml
+@@ -0,0 +1,31 @@
++---
++# QR-DQN, 10M steps. Settings from train_qrdqn_wr.yml (the repo's world-record attempt config),
++# shortened from 32M to 10M steps.
++seed: ~
++run_id: ~
++model_load_file: ~
++out_dir_template: "data/QRDQN-{run_id}"
++log_tensorboard: true
++total_timesteps: 10_000_000
++max_episode_steps: 1000
++n_checkpoints: 20  # every 500k steps
++n_envs: 8  # 8 games in parallel processes (1 CPU core each); training stays on the GPU
++learner_kwargs:
++  policy: "MlpPolicy"
++  buffer_size: 100000
++  learning_starts: 100000
++  batch_size: 64
++  tau: 1.0
++  gamma: 0.997
++  train_freq: 4
++  gradient_steps: 8  # train_freq counts steps of all 8 games: 8 updates per 32 transitions = 1 per 4, as with 1 game
++  target_update_interval: 512
++  exploration_fraction: 0.3  # epsilon 0.2 -> 0 over the first 3M steps
++  exploration_initial_eps: 0.2
++  exploration_final_eps: 0
++learner_lr_schedule: "const_0.001"
++env_kwargs:
++  __include__: "config/env.yml"
++  frames_per_step: 4
++  reduced_action_set: true  # 9 actions instead of 16 (drops redundant key combos)
++env_wrappers: []
 diff --git a/qwop_python/tools/train_sb3.py b/qwop_python/tools/train_sb3.py
 index 93ee3c4..851c0eb 100644
 --- a/qwop_python/tools/train_sb3.py
