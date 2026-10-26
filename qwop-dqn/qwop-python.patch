@@ -1,0 +1,45 @@
+diff --git a/config/train_dqn.yml b/config/train_dqn.yml
+index f290afd..adfa737 100644
+--- a/config/train_dqn.yml
++++ b/config/train_dqn.yml
+@@ -17,7 +17,7 @@ out_dir_template: "data/DQN-{run_id}"
+ log_tensorboard: true
+ 
+ # [int] Training duration (set to a minimum of 20M for DQN)
+-total_timesteps: 200000
++total_timesteps: 1000000
+ 
+ # [int] (optional) Force env termination on the Nth step of an episode
+ max_episode_steps: 5000
+@@ -37,8 +37,8 @@ learner_kwargs:
+   gamma: 0.995
+   train_freq: 4
+   gradient_steps: 1
+-  target_update_interval: 100000
+-  exploration_fraction: 0.01
++  target_update_interval: 10000
++  exploration_fraction: 0.3
+   exploration_initial_eps: 1
+   exploration_final_eps: 0.01
+ 
+diff --git a/qwop_python/tools/train_sb3.py b/qwop_python/tools/train_sb3.py
+index 93ee3c4..851c0eb 100644
+--- a/qwop_python/tools/train_sb3.py
++++ b/qwop_python/tools/train_sb3.py
+@@ -157,7 +157,7 @@ def init_model(
+ 
+     if log_tensorboard:
+         os.makedirs(out_dir, exist_ok=True)
+-        log = logger.configure(folder=out_dir, format_strings=["tensorboard"])
++        log = logger.configure(folder=out_dir, format_strings=["stdout", "tensorboard"])
+         model.set_logger(log)
+ 
+     return model
+@@ -286,6 +286,7 @@ def train_sb3(
+         model.learn(
+             total_timesteps=learn_total,
+             reset_num_timesteps=reset_num_timesteps,
++            log_interval=100,  # stats table every 100 episodes; early QWOP episodes are ~27 steps
+             progress_bar=True,
+             callback=callbacks,
+         )
