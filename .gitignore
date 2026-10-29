@@ -4,3 +4,7 @@ logs/
 data/
 *.zip
 *.mp4
+*.log
+ml-agents/
+training-envs-executables/
+results/
