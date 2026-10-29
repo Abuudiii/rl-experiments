@@ -1,14 +1,14 @@
 # ML-Agents — SnowballTarget and Pyramids
 Hugging Face [Deep RL course, unit 5](https://huggingface.co/learn/deep-rl-course/unit5/introduction):
 PPO agents trained with Unity [ML-Agents](https://github.com/Unity-Technologies/ml-agents) on two Unity games.
-`SnowballTarget.yaml` is the notebook's config; `PyramidsRND.yaml` is upstream's with `max_steps` cut to 1M, as the notebook says.
+`SnowballTarget.yaml` is the notebook's config; `PyramidsRND.yaml` is upstream's with `max_steps` set to 2M (the notebook says 1M, which wasn't enough here).
 
 **Models:** [SnowballTarget](https://huggingface.co/Abuudiii/ppo-SnowballTarget), [Pyramids](https://huggingface.co/Abuudiii/ppo-Pyramids)
 ## Result
 | | |
 |---|---|
 | SnowballTarget | 200k steps, ~9 min on an AMD Instinct MI100 (ROCm); mean reward 4.3 → 26.0 ± 2.3 |
-| Pyramids | 1M steps, ~41 min on the MI100; reward stays near −1 until ~700k, ends ~0.9 (course target 1.75) |
+| Pyramids | 2M steps (1M, then `--resume` to 2M), ~83 min on the MI100; reward stays near −1 until ~700k, 0.9 at 1M, ~1.67 at 2M (course target 1.75) |
 
 ## Setup
 ML-Agents needs Python 3.10 (≤ 3.10.12) and torch ≤ 2.8.

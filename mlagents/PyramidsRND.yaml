@@ -27,6 +27,6 @@ behaviors:
           num_layers: 3
         learning_rate: 0.0001
     keep_checkpoints: 5
-    max_steps: 1000000  # notebook: 3M upstream, 1M reaches the 1.75 benchmark
+    max_steps: 2000000  # upstream 3M, notebook 1M; ours was still climbing at 1M (~0.9), so resumed to 2M
     time_horizon: 128
     summary_freq: 30000
