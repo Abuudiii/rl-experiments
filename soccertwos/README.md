@@ -10,8 +10,8 @@ unmaintained (the Space was in `RUNTIME_ERROR` at setup time), but pushing a mod
 ## Result
 | | |
 |---|---|
-| Training | 5M steps, ~1h45 on an NVIDIA RTX PRO 4000 Blackwell (stopped at 500k, continued with `--resume`) |
-| Self-play ELO | 1200 → 1167; stayed flat-to-slightly-down the whole run |
+| Training | 10M steps, ~4h on an NVIDIA RTX PRO 4000 Blackwell, across three `--resume`d sessions |
+| Self-play ELO | 1200 → 1167 at 5M (agents camped in their own goal), then 1223 at 6M, 1443 at 7M, 1555 at 8M, 1660 at 10M |
 
 ## Setup
 Reuses the ML-Agents clone from [`../mlagents`](../mlagents/); this venv has CUDA torch (≤ 2.8 for ML-Agents).
