@@ -158,13 +158,13 @@ def record_video(env, policy, out_directory, fps=30, attempts=5):
     best, best_x = None, -1
     for _ in range(attempts):
         state, _ = env.reset()
-        images = [env.render()]
+        images = [env.render().copy()]  # nes-py reuses one screen buffer; without .copy() every frame is the last
         done = False
         while not done:
             with torch.no_grad():
                 action, _, _, _ = policy.get_action_and_value(torch.Tensor(state).unsqueeze(0).to(device))
             state, _, terminated, truncated, info = env.step(action.item())
-            images.append(env.render())
+            images.append(env.render().copy())
             done = terminated or truncated
         if info["flag_get"]:
             best = images
