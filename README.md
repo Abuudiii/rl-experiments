@@ -11,3 +11,4 @@ Reinforcement learning experiments, one per directory. Trained on AMD GPUs with 
 | [`a2c-panda/`](a2c-panda/) | A2C on the panda-gym robot arm, PandaReachDense (HF Deep RL course, unit 6) | [hub](https://huggingface.co/Abuudiii/a2c-PandaReachDense-v3) |
 | [`soccertwos/`](soccertwos/) | 2v2 soccer with MA-POCA self-play in ML-Agents (HF Deep RL course, unit 7) | [hub](https://huggingface.co/Abuudiii/poca-SoccerTwos) |
 | [`ppo-lunarlander/`](ppo-lunarlander/) | PPO written from scratch (CleanRL) on LunarLander (HF Deep RL course, unit 8 part 1) | [hub](https://huggingface.co/Abuudiii/ppo-LunarLander-v3) |
+| [`ppo-mario/`](ppo-mario/) | PPO from pixels (CNN) on Super Mario Bros 1-1: clears the level 9/10 | [hub](https://huggingface.co/Abuudiii/ppo-SuperMarioBros-1-1) |
