@@ -8,3 +8,5 @@ data/
 ml-agents/
 training-envs-executables/
 results/
+runs/
+videos/
