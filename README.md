@@ -1,6 +1,7 @@
 # rl-experiments
 
-Reinforcement learning experiments, one per directory. Trained on AMD GPUs with ROCm.
+Reinforcement learning experiments, one per directory. Most were trained on AMD GPUs with ROCm; `ppo-mario/` and
+`grpo-rlhf-qwen/` on NVIDIA GPUs.
 
 | Directory | What | Model |
 |---|---|---|
