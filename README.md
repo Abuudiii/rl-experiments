@@ -12,3 +12,4 @@ Reinforcement learning experiments, one per directory. Trained on AMD GPUs with 
 | [`soccertwos/`](soccertwos/) | 2v2 soccer with MA-POCA self-play in ML-Agents (HF Deep RL course, unit 7) | [hub](https://huggingface.co/Abuudiii/poca-SoccerTwos) |
 | [`ppo-lunarlander/`](ppo-lunarlander/) | PPO written from scratch (CleanRL) on LunarLander (HF Deep RL course, unit 8 part 1) | [hub](https://huggingface.co/Abuudiii/ppo-LunarLander-v3) |
 | [`ppo-mario/`](ppo-mario/) | PPO from pixels (CNN) on Super Mario Bros 1-1: clears the level 9/10 | [hub](https://huggingface.co/Abuudiii/ppo-SuperMarioBros-1-1) |
+| [`grpo-rlhf-qwen/`](grpo-rlhf-qwen/) | RLHF on Qwen2.5-1.5B: reward models from Anthropic's HH-RLHF human votes, then GRPO (TRL) rewarding helpful only, harmless only, or both | — |

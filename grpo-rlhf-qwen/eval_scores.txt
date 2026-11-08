@@ -1,0 +1,17 @@
+model            prompts   helpful RM harmless RM refusal %  words
+base             helpful        -0.63        0.23       7.0    107
+base             harmless       -3.13        1.59      62.5     58
+helpful          helpful         0.05       -0.17       5.5    134
+helpful          harmless       -1.48        0.01      56.0    132
+harmless         helpful        -4.29        2.26      77.5     33
+harmless         harmless       -5.01        3.16      98.0     12
+harmless_ck100   helpful        -6.63        3.73      93.0      7
+harmless_ck100   harmless       -6.59        4.10      99.5      7
+harmless_ck300   helpful        -7.23        4.32      99.5     14
+harmless_ck300   harmless       -6.93        4.40     100.0     14
+harmless_ck500   helpful        -7.26        4.37     100.0     13
+harmless_ck500   harmless       -6.94        4.42     100.0     13
+harmless_ck700   helpful        -6.77        3.92      97.0     12
+harmless_ck700   harmless       -6.41        4.00      99.5     11
+combined         helpful        -0.18        0.28      32.0    130
+combined         harmless       -2.19        2.18      94.0     98

@@ -1,0 +1,8 @@
+rm_helpful/
+rm_harmless/
+eval/
+
+# Trained models stay out of git; only the training logs read by make_charts.py are kept.
+grpo_*/**
+!grpo_*/checkpoint-1000/
+!grpo_*/checkpoint-1000/trainer_state.json
