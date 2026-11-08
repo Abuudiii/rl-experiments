@@ -3,6 +3,10 @@ Fine-tune Qwen2.5-1.5B-Instruct three ways using reward models trained on human 
 [Anthropic's HH-RLHF](https://huggingface.co/datasets/Anthropic/hh-rlhf): rewarded for helpfulness only, harmlessness
 only, and both summed. Same prompts and settings in every run; only the reward changes.
 
+**Models:** [helpful](https://huggingface.co/Abuudiii/grpo-Qwen2.5-1.5B-hh-rlhf-helpful) ·
+[harmless](https://huggingface.co/Abuudiii/grpo-Qwen2.5-1.5B-hh-rlhf-harmless) ·
+[combined](https://huggingface.co/Abuudiii/grpo-Qwen2.5-1.5B-hh-rlhf-combined)
+
 ![Same prompts, four models](figures/examples.jpg)
 
 ## Result
@@ -70,9 +74,10 @@ bash run_all.sh   # data -> 2 reward models -> 3 GRPO runs -> evaluation -> figu
 | `evaluate.py gen <model> <tag>` / `score <tags…>` | Greedy answers to the held-out prompts; scores them with both reward models |
 | `prompt_shots.py`, `render_heldout.py`, `make_examples.py`, `make_charts.py` | The figures |
 | `pick_examples.py` | Prints prompts where the models disagree most |
+| `push_to_hub.py <hf-user>` | Publishes the three policies (bf16) with model cards, then checks each upload |
 
-Model weights and raw answers aren't in the repo. The red-team half of HH-RLHF contains offensive requests, and the
-helpful-only model's answers to them are not something to publish.
+Raw answers aren't in the repo: the red-team half of HH-RLHF contains offensive requests, and the helpful-only
+model's answers to them are not something to publish. The model weights are on the Hub (links above).
 
 ## Caveats
 - Refusal rates come from a keyword match, not human judgment.
