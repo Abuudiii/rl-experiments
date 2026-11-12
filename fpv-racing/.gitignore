@@ -1,0 +1,7 @@
+.venv-sim/
+third_party/
+# single frames of the feasibility checks; the *_sheet.png files tile them
+checks/out/pose_*.png
+checks/out/gates_*.png
+checks/out/sync_*.png
+!checks/out/*_contact_sheet.png

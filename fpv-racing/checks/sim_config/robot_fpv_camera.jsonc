@@ -1,0 +1,31 @@
+{
+  // non-physics: AirSim never integrates dynamics; the robot only moves on SetPose
+  "physics-type": "non-physics",
+  "links": [ { "name": "Frame", "collision": { "enabled": false } } ],
+  "sensors": [
+    {
+      "id": "Fpv",
+      "type": "camera",
+      "enabled": true,
+      "parent-link": "Frame",
+      // must be smaller than the clock step so every step triggers a capture
+      "capture-interval": 0.001,
+      "capture-settings": [
+        {
+          "image-type": 0,
+          "width": 160,
+          "height": 120,
+          "fov-degrees": 110,
+          "capture-enabled": true,
+          "streaming-enabled": false,
+          "pixels-as-float": false,
+          "compress": false,
+          "target-gamma": 2.5,
+          "motion-blur-amount": 0.0
+        }
+      ],
+      // NED body frame: +pitch = nose up
+      "origin": { "xyz": "0.0 0.0 0.0", "rpy-deg": "0 20 0" }
+    }
+  ]
+}

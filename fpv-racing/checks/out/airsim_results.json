@@ -1,0 +1,1676 @@
+{
+ "pose": {
+  "actors": [
+   "Cam"
+  ],
+  "sensors": {
+   "Fpv": [
+    "scene_camera",
+    "scene_camera_info"
+   ]
+  },
+  "max_robot_pos_err_m": 0.0,
+  "max_robot_rot_err_deg": 0.01881883968796682,
+  "max_frame_pos_err_m": 0.0,
+  "max_frame_rot_err_deg": 0.023027845509669107,
+  "drift_after_50_idle_steps_m": 0.0,
+  "image_mean_abs_change_after_50_idle_steps": 0.338,
+  "image_rotation": {
+   "yaw_right_30": {
+    "matches": 28,
+    "commanded_rotvec_deg": [
+     0.0,
+     -28.19,
+     10.26
+    ],
+    "image_rotvec_deg": [
+     -0.97,
+     -28.37,
+     9.67
+    ],
+    "rotation_err_deg": 1.131,
+    "mean_feature_shift_px": [
+     -144.5,
+     -0.5
+    ]
+   },
+   "yaw_left_30": {
+    "matches": 34,
+    "commanded_rotvec_deg": [
+     0.0,
+     28.19,
+     -10.26
+    ],
+    "image_rotvec_deg": [
+     1.69,
+     28.46,
+     -10.24
+    ],
+    "rotation_err_deg": 1.691,
+    "mean_feature_shift_px": [
+     138.8,
+     1.3
+    ]
+   },
+   "nose_up_25": {
+    "matches": 11,
+    "commanded_rotvec_deg": [
+     -25.0,
+     0.0,
+     0.0
+    ],
+    "image_rotvec_deg": [
+     -22.99,
+     0.1,
+     0.89
+    ],
+    "rotation_err_deg": 2.197,
+    "mean_feature_shift_px": [
+     -6.8,
+     116.4
+    ]
+   },
+   "nose_down_25": {
+    "matches": 37,
+    "commanded_rotvec_deg": [
+     25.0,
+     0.0,
+     0.0
+    ],
+    "image_rotvec_deg": [
+     24.56,
+     -0.12,
+     0.04
+    ],
+    "rotation_err_deg": 0.454,
+    "mean_feature_shift_px": [
+     0.5,
+     -100.9
+    ]
+   },
+   "roll_right_30": {
+    "matches": 58,
+    "commanded_rotvec_deg": [
+     -0.0,
+     -10.26,
+     -28.19
+    ],
+    "image_rotvec_deg": [
+     -0.32,
+     -10.32,
+     -28.23
+    ],
+    "rotation_err_deg": 0.325,
+    "mean_feature_shift_px": [
+     -18.9,
+     3.2
+    ]
+   }
+  },
+  "image_translation": {
+   "up_4m": {
+    "matches": 11,
+    "commanded_dir_cam": [
+     0.0,
+     0.94,
+     -0.342
+    ],
+    "image_dir_cam": [
+     -0.019,
+     0.99,
+     -0.141
+    ],
+    "direction_err_deg": 11.93,
+    "spurious_rotation_deg": 3.468
+   },
+   "left_3m": {
+    "matches": 55,
+    "commanded_dir_cam": [
+     1.0,
+     0.0,
+     0.0
+    ],
+    "image_dir_cam": [
+     0.995,
+     -0.062,
+     -0.079
+    ],
+    "direction_err_deg": 5.76,
+    "spurious_rotation_deg": 0.401
+   },
+   "forward_5m": {
+    "matches": 31,
+    "commanded_dir_cam": [
+     0.0,
+     -0.342,
+     -0.94
+    ],
+    "image_dir_cam": [
+     0.035,
+     -0.328,
+     -0.944
+    ],
+    "direction_err_deg": 2.19,
+    "spurious_rotation_deg": 0.449
+   }
+  }
+ },
+ "gates": {
+  "spawned": [
+   "Gate0",
+   "Gate1",
+   "Gate2",
+   "Gate3",
+   "Gate4",
+   "Gate5"
+  ],
+  "gates": [
+   {
+    "name": "Gate0",
+    "sim_pos_err_m": 0.0,
+    "sim_rot_err_deg": 0.02120053547258985,
+    "mask_px": 8549,
+    "expected_px": 8736,
+    "iou_all_gates": 0.9777,
+    "mean_bgr_in_gate": [
+     232.0,
+     111.0,
+     253.0
+    ],
+    "opening_corners_px": [
+     [
+      289.62,
+      149.62
+     ],
+     [
+      349.38,
+      149.62
+     ],
+     [
+      349.38,
+      209.38
+     ],
+     [
+      289.62,
+      209.38
+     ]
+    ],
+    "outer_corner_err_px": [
+     1.35,
+     1.35,
+     1.35,
+     1.35
+    ],
+    "opening_corner_err_px": [
+     0.55,
+     0.55,
+     0.55,
+     0.55
+    ],
+    "opening_centre_err_px": [
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "name": "Gate1",
+    "sim_pos_err_m": 4.7683715642676816e-08,
+    "sim_rot_err_deg": 0.0,
+    "mask_px": 8770,
+    "expected_px": 8736,
+    "iou_all_gates": 0.9788,
+    "mean_bgr_in_gate": [
+     230.0,
+     100.0,
+     251.0
+    ],
+    "opening_corners_px": [
+     [
+      289.62,
+      149.62
+     ],
+     [
+      349.38,
+      149.62
+     ],
+     [
+      349.38,
+      209.38
+     ],
+     [
+      289.62,
+      209.38
+     ]
+    ],
+    "outer_corner_err_px": [
+     1.86,
+     1.86,
+     1.86,
+     1.86
+    ],
+    "opening_corner_err_px": [
+     0.55,
+     0.55,
+     0.55,
+     0.55
+    ],
+    "opening_centre_err_px": [
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "name": "Gate2",
+    "sim_pos_err_m": 0.0,
+    "sim_rot_err_deg": 0.0,
+    "mask_px": 8771,
+    "expected_px": 8736,
+    "iou_all_gates": 0.9749,
+    "mean_bgr_in_gate": [
+     218.0,
+     51.0,
+     239.0
+    ],
+    "opening_corners_px": [
+     [
+      289.62,
+      149.62
+     ],
+     [
+      349.38,
+      149.62
+     ],
+     [
+      349.38,
+      209.38
+     ],
+     [
+      289.62,
+      209.38
+     ]
+    ],
+    "outer_corner_err_px": [
+     1.86,
+     1.86,
+     1.35,
+     1.35
+    ],
+    "opening_corner_err_px": [
+     0.55,
+     0.55,
+     0.55,
+     0.55
+    ],
+    "opening_centre_err_px": [
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "name": "Gate3",
+    "sim_pos_err_m": 9.536743172944284e-08,
+    "sim_rot_err_deg": 0.0,
+    "mask_px": 8747,
+    "expected_px": 8736,
+    "iou_all_gates": 0.9801,
+    "mean_bgr_in_gate": [
+     213.0,
+     29.0,
+     233.0
+    ],
+    "opening_corners_px": [
+     [
+      289.62,
+      149.62
+     ],
+     [
+      349.38,
+      149.62
+     ],
+     [
+      349.38,
+      209.38
+     ],
+     [
+      289.62,
+      209.38
+     ]
+    ],
+    "outer_corner_err_px": [
+     1.35,
+     1.35,
+     1.86,
+     1.86
+    ],
+    "opening_corner_err_px": [
+     0.55,
+     0.55,
+     0.55,
+     0.55
+    ],
+    "opening_centre_err_px": [
+     0.0,
+     -0.0
+    ]
+   },
+   {
+    "name": "Gate4",
+    "sim_pos_err_m": 0.0,
+    "sim_rot_err_deg": 0.0,
+    "mask_px": 8746,
+    "expected_px": 8736,
+    "iou_all_gates": 0.9829,
+    "mean_bgr_in_gate": [
+     213.0,
+     32.0,
+     233.0
+    ],
+    "opening_corners_px": [
+     [
+      289.62,
+      149.62
+     ],
+     [
+      349.38,
+      149.62
+     ],
+     [
+      349.38,
+      209.38
+     ],
+     [
+      289.62,
+      209.38
+     ]
+    ],
+    "outer_corner_err_px": [
+     1.35,
+     1.35,
+     1.86,
+     1.86
+    ],
+    "opening_corner_err_px": [
+     0.55,
+     0.55,
+     0.55,
+     0.55
+    ],
+    "opening_centre_err_px": [
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "name": "Gate5",
+    "sim_pos_err_m": 4.7683715642676816e-08,
+    "sim_rot_err_deg": 0.0,
+    "mask_px": 8778,
+    "expected_px": 8736,
+    "iou_all_gates": 0.9817,
+    "mean_bgr_in_gate": [
+     221.0,
+     64.0,
+     242.0
+    ],
+    "opening_corners_px": [
+     [
+      289.62,
+      149.62
+     ],
+     [
+      349.38,
+      149.62
+     ],
+     [
+      349.38,
+      209.38
+     ],
+     [
+      289.62,
+      209.38
+     ]
+    ],
+    "outer_corner_err_px": [
+     1.86,
+     1.86,
+     1.86,
+     1.86
+    ],
+    "opening_corner_err_px": [
+     0.55,
+     0.55,
+     0.55,
+     0.55
+    ],
+    "opening_centre_err_px": [
+     0.0,
+     0.0
+    ]
+   }
+  ],
+  "available_assets": 111,
+  "overview": {
+   "iou": 0.8156,
+   "mask_px": 1017,
+   "expected_px": 1247,
+   "gates_found": 6,
+   "gate_centroid_err_px": [
+    0.12,
+    0.16,
+    0.3,
+    0.96,
+    0.84,
+    0.08
+   ]
+  },
+  "overview2": {
+   "iou": 0.8128,
+   "mask_px": 1316,
+   "expected_px": 1608,
+   "gates_found": 6,
+   "gate_centroid_err_px": [
+    0.27,
+    0.28,
+    0.59,
+    0.16,
+    0.34,
+    0.29
+   ]
+  },
+  "topdown": {
+   "iou": 0.7178,
+   "mask_px": 829,
+   "expected_px": 1143,
+   "gates_found": 6,
+   "gate_centroid_err_px": [
+    0.96,
+    0.25,
+    0.69,
+    0.17,
+    0.73,
+    0.58
+   ]
+  },
+  "max_opening_corner_err_px": 0.55,
+  "max_outer_corner_err_px": 1.86,
+  "gates_verified": 6
+ },
+ "multi [double]": [
+  {
+   "instances": 1,
+   "res": "160x120",
+   "mode": "double",
+   "sim_args": "",
+   "fps_total": 15.4,
+   "fps_per_instance": 15.4,
+   "fps_min": 15.4,
+   "fps_max": 15.4,
+   "gpu_util_mean": 56.1,
+   "gpu_util_max": 87.0,
+   "gpu_mem_mib_max": 1134.0,
+   "sim_cpu_cores_per_instance": 1.89,
+   "client_cpu_cores_per_instance": 0.03,
+   "ms_set_pose": 0.6,
+   "ms_clock_step": 1.11,
+   "ms_wait_frame": 63.13,
+   "sim_gpus": [
+    4
+   ],
+   "frames_ok": true
+  }
+ ],
+ "multi [pipelined+-dpcvars=sg.ViewDistanceQuality=0,sg.AntiAliasingQuality=0,sg.ShadowQuality=0,sg.GlobalIlluminationQuality=0,sg.ReflectionQuality=0,sg.PostProcessQuality=0,sg.TextureQuality=0,sg.EffectsQuality=0,sg.FoliageQuality=0,sg.ShadingQuality=0+sg0]": [
+  {
+   "instances": 1,
+   "res": "160x120",
+   "mode": "pipelined",
+   "sim_args": "-dpcvars=sg.ViewDistanceQuality=0,sg.AntiAliasingQuality=0,sg.ShadowQuality=0,sg.GlobalIlluminationQuality=0,sg.ReflectionQuality=0,sg.PostProcessQuality=0,sg.TextureQuality=0,sg.EffectsQuality=0,sg.FoliageQuality=0,sg.ShadingQuality=0",
+   "fps_total": 32.4,
+   "fps_per_instance": 32.4,
+   "fps_min": 32.4,
+   "fps_max": 32.4,
+   "gpu_util_mean": 47.6,
+   "gpu_util_max": 84.0,
+   "gpu_mem_mib_max": 1134.0,
+   "sim_cpu_cores_per_instance": 1.88,
+   "client_cpu_cores_per_instance": 0.04,
+   "ms_set_pose": 0.62,
+   "ms_clock_step": 0.53,
+   "ms_wait_frame": 29.62,
+   "sim_gpus": [
+    4
+   ],
+   "frames_ok": true
+  }
+ ],
+ "multi [pipelined+-dpcvars=t.MaxFPS=1000,r.VSync=0+maxfps]": [
+  {
+   "instances": 1,
+   "res": "160x120",
+   "mode": "pipelined",
+   "sim_args": "-dpcvars=t.MaxFPS=1000,r.VSync=0",
+   "fps_total": 33.4,
+   "fps_per_instance": 33.4,
+   "fps_min": 33.4,
+   "fps_max": 33.4,
+   "gpu_util_mean": 53.7,
+   "gpu_util_max": 88.0,
+   "gpu_mem_mib_max": 1134.0,
+   "sim_cpu_cores_per_instance": 1.82,
+   "client_cpu_cores_per_instance": 0.03,
+   "ms_set_pose": 0.57,
+   "ms_clock_step": 0.49,
+   "ms_wait_frame": 28.74,
+   "sim_gpus": [
+    4
+   ],
+   "frames_ok": true
+  }
+ ],
+ "sync": {
+  "ref_gap_mean_abs": 40.68,
+  "naive_single_step/alternate": {
+   "frames": 200,
+   "wrong_view_frames": 200,
+   "failure_rate": 1.0,
+   "messages_received": 200,
+   "stray_messages": 0,
+   "match_rate_if_lag1": 1.0,
+   "match_rate_if_lag2": 0.0,
+   "mean_abs_diff_to_own_ref": null,
+   "max_abs_diff_to_own_ref": null
+  },
+  "naive_single_step/random": {
+   "frames": 200,
+   "wrong_view_frames": 97,
+   "failure_rate": 0.485,
+   "messages_received": 200,
+   "stray_messages": 0,
+   "match_rate_if_lag1": 1.0,
+   "match_rate_if_lag2": 0.52,
+   "mean_abs_diff_to_own_ref": 0.299,
+   "max_abs_diff_to_own_ref": 0.35
+  },
+  "double_step/alternate": {
+   "frames": 200,
+   "wrong_view_frames": 0,
+   "failure_rate": 0.0,
+   "messages_received": 400,
+   "stray_messages": 0,
+   "match_rate_if_lag1": 0.0,
+   "match_rate_if_lag2": 1.0,
+   "mean_abs_diff_to_own_ref": 0.253,
+   "max_abs_diff_to_own_ref": 0.344
+  },
+  "double_step/random": {
+   "frames": 200,
+   "wrong_view_frames": 0,
+   "failure_rate": 0.0,
+   "messages_received": 400,
+   "stray_messages": 0,
+   "match_rate_if_lag1": 0.518,
+   "match_rate_if_lag2": 0.51,
+   "mean_abs_diff_to_own_ref": 0.254,
+   "max_abs_diff_to_own_ref": 0.35
+  },
+  "pipelined/alternate": {
+   "frames": 200,
+   "wrong_view_frames": 0,
+   "failure_rate": 0.0,
+   "messages_received": 201,
+   "stray_messages": 0,
+   "match_rate_if_lag1": 0.0,
+   "match_rate_if_lag2": 1.0,
+   "mean_abs_diff_to_own_ref": 0.297,
+   "max_abs_diff_to_own_ref": 0.35
+  },
+  "pipelined/random": {
+   "frames": 200,
+   "wrong_view_frames": 0,
+   "failure_rate": 0.0,
+   "messages_received": 201,
+   "stray_messages": 0,
+   "match_rate_if_lag1": 0.518,
+   "match_rate_if_lag2": 0.51,
+   "mean_abs_diff_to_own_ref": 0.296,
+   "max_abs_diff_to_own_ref": 0.35
+  },
+  "free_running/alternate": {
+   "frames": 200,
+   "wrong_view_frames": 0,
+   "failure_rate": 0.0,
+   "messages_received": 202,
+   "stray_messages": 0,
+   "match_rate_if_lag1": 0.0,
+   "match_rate_if_lag2": 1.0,
+   "mean_abs_diff_to_own_ref": 0.297,
+   "max_abs_diff_to_own_ref": 0.35
+  },
+  "free_running/random": {
+   "frames": 200,
+   "wrong_view_frames": 0,
+   "failure_rate": 0.0,
+   "messages_received": 202,
+   "stray_messages": 0,
+   "match_rate_if_lag1": 0.518,
+   "match_rate_if_lag2": 0.51,
+   "mean_abs_diff_to_own_ref": 0.297,
+   "max_abs_diff_to_own_ref": 0.35
+  },
+  "free_running_assuming_no_lag/alternate": {
+   "frames": 200,
+   "wrong_view_frames": 200,
+   "failure_rate": 1.0,
+   "messages_received": 201,
+   "stray_messages": 0,
+   "match_rate_if_lag1": 1.0,
+   "match_rate_if_lag2": 0.0,
+   "mean_abs_diff_to_own_ref": null,
+   "max_abs_diff_to_own_ref": null
+  },
+  "free_running_assuming_no_lag/random": {
+   "frames": 200,
+   "wrong_view_frames": 97,
+   "failure_rate": 0.485,
+   "messages_received": 201,
+   "stray_messages": 0,
+   "match_rate_if_lag1": 1.0,
+   "match_rate_if_lag2": 0.52,
+   "mean_abs_diff_to_own_ref": 0.299,
+   "max_abs_diff_to_own_ref": 0.35
+  }
+ },
+ "multi [free]": [
+  {
+   "instances": 1,
+   "res": "160x120",
+   "mode": "free",
+   "sim_args": "",
+   "fps_total": 25.2,
+   "fps_per_instance": 25.2,
+   "fps_min": 25.2,
+   "fps_max": 25.2,
+   "gpu_util_mean": 52.1,
+   "gpu_util_max": 79.0,
+   "gpu_mem_mib_max": 1134.0,
+   "sim_cpu_cores_per_instance": 1.73,
+   "client_cpu_cores_per_instance": 0.02,
+   "ms_set_pose": 0.47,
+   "ms_clock_step": 0.0,
+   "ms_wait_frame": 38.09,
+   "sim_gpus": [
+    4
+   ],
+   "frames_ok": true
+  }
+ ],
+ "multi [pipelined+scan]": [
+  {
+   "instances": 1,
+   "res": "160x120",
+   "mode": "pipelined",
+   "sim_args": "",
+   "fps_total": 32.2,
+   "fps_per_instance": 32.2,
+   "fps_min": 32.2,
+   "fps_max": 32.2,
+   "gpu_util_mean": 56.2,
+   "gpu_util_max": 90.0,
+   "gpu_mem_mib_max": 1174.0,
+   "sim_cpu_cores_per_instance": 1.89,
+   "client_cpu_cores_per_instance": 0.03,
+   "ms_set_pose": 0.54,
+   "ms_clock_step": 0.47,
+   "ms_wait_frame": 29.95,
+   "sim_gpus": [
+    4
+   ],
+   "cvars": "",
+   "frames_ok": true
+  }
+ ],
+ "multi [pipelined+r.DynamicGlobalIlluminationMethod=0+scan]": [
+  {
+   "instances": 1,
+   "res": "160x120",
+   "mode": "pipelined",
+   "sim_args": "",
+   "fps_total": 31.3,
+   "fps_per_instance": 31.3,
+   "fps_min": 31.3,
+   "fps_max": 31.3,
+   "gpu_util_mean": 58.8,
+   "gpu_util_max": 84.0,
+   "gpu_mem_mib_max": 1134.0,
+   "sim_cpu_cores_per_instance": 2.03,
+   "client_cpu_cores_per_instance": 0.04,
+   "ms_set_pose": 0.72,
+   "ms_clock_step": 0.61,
+   "ms_wait_frame": 30.49,
+   "sim_gpus": [
+    4
+   ],
+   "cvars": "r.DynamicGlobalIlluminationMethod=0",
+   "frames_ok": true
+  }
+ ],
+ "multi [pipelined+r.ReflectionMethod=0+scan]": [
+  {
+   "instances": 1,
+   "res": "160x120",
+   "mode": "pipelined",
+   "sim_args": "",
+   "fps_total": 32.5,
+   "fps_per_instance": 32.5,
+   "fps_min": 32.5,
+   "fps_max": 32.5,
+   "gpu_util_mean": 53.7,
+   "gpu_util_max": 79.0,
+   "gpu_mem_mib_max": 1130.0,
+   "sim_cpu_cores_per_instance": 2.01,
+   "client_cpu_cores_per_instance": 0.04,
+   "ms_set_pose": 0.76,
+   "ms_clock_step": 0.63,
+   "ms_wait_frame": 29.23,
+   "sim_gpus": [
+    4
+   ],
+   "cvars": "r.ReflectionMethod=0",
+   "frames_ok": true
+  }
+ ],
+ "multi [pipelined+r.Shadow.Virtual.Enable=0+scan]": [
+  {
+   "instances": 1,
+   "res": "160x120",
+   "mode": "pipelined",
+   "sim_args": "",
+   "fps_total": 31.8,
+   "fps_per_instance": 31.8,
+   "fps_min": 31.8,
+   "fps_max": 31.8,
+   "gpu_util_mean": 42.5,
+   "gpu_util_max": 86.0,
+   "gpu_mem_mib_max": 1134.0,
+   "sim_cpu_cores_per_instance": 1.99,
+   "client_cpu_cores_per_instance": 0.04,
+   "ms_set_pose": 0.73,
+   "ms_clock_step": 0.63,
+   "ms_wait_frame": 29.92,
+   "sim_gpus": [
+    4
+   ],
+   "cvars": "r.Shadow.Virtual.Enable=0",
+   "frames_ok": true
+  }
+ ],
+ "multi [pipelined+r.ShadowQuality=0+scan]": [
+  {
+   "instances": 1,
+   "res": "160x120",
+   "mode": "pipelined",
+   "sim_args": "",
+   "fps_total": 55.0,
+   "fps_per_instance": 55.0,
+   "fps_min": 55.0,
+   "fps_max": 55.0,
+   "gpu_util_mean": 44.6,
+   "gpu_util_max": 84.0,
+   "gpu_mem_mib_max": 1083.0,
+   "sim_cpu_cores_per_instance": 2.21,
+   "client_cpu_cores_per_instance": 0.04,
+   "ms_set_pose": 0.46,
+   "ms_clock_step": 0.42,
+   "ms_wait_frame": 17.2,
+   "sim_gpus": [
+    4
+   ],
+   "cvars": "r.ShadowQuality=0",
+   "frames_ok": true
+  }
+ ],
+ "multi [pipelined+r.BloomQuality=0+scan]": [
+  {
+   "instances": 1,
+   "res": "160x120",
+   "mode": "pipelined",
+   "sim_args": "",
+   "fps_total": 31.8,
+   "fps_per_instance": 31.8,
+   "fps_min": 31.8,
+   "fps_max": 31.8,
+   "gpu_util_mean": 37.8,
+   "gpu_util_max": 76.0,
+   "gpu_mem_mib_max": 1134.0,
+   "sim_cpu_cores_per_instance": 1.9,
+   "client_cpu_cores_per_instance": 0.04,
+   "ms_set_pose": 0.7,
+   "ms_clock_step": 0.58,
+   "ms_wait_frame": 30.05,
+   "sim_gpus": [
+    4
+   ],
+   "cvars": "r.BloomQuality=0",
+   "frames_ok": true
+  }
+ ],
+ "multi [pipelined+r.AntiAliasingMethod=0+scan]": [
+  {
+   "instances": 1,
+   "res": "160x120",
+   "mode": "pipelined",
+   "sim_args": "",
+   "fps_total": 33.2,
+   "fps_per_instance": 33.2,
+   "fps_min": 33.2,
+   "fps_max": 33.2,
+   "gpu_util_mean": 61.1,
+   "gpu_util_max": 79.0,
+   "gpu_mem_mib_max": 1174.0,
+   "sim_cpu_cores_per_instance": 1.92,
+   "client_cpu_cores_per_instance": 0.04,
+   "ms_set_pose": 0.71,
+   "ms_clock_step": 0.61,
+   "ms_wait_frame": 28.63,
+   "sim_gpus": [
+    4
+   ],
+   "cvars": "r.AntiAliasingMethod=0",
+   "frames_ok": true
+  }
+ ],
+ "multi [pipelined+r.DynamicGlobalIlluminationMethod=0,r.ReflectionMethod=0+scan]": [
+  {
+   "instances": 1,
+   "res": "160x120",
+   "mode": "pipelined",
+   "sim_args": "",
+   "fps_total": 32.9,
+   "fps_per_instance": 32.9,
+   "fps_min": 32.9,
+   "fps_max": 32.9,
+   "gpu_util_mean": 45.1,
+   "gpu_util_max": 86.0,
+   "gpu_mem_mib_max": 1130.0,
+   "sim_cpu_cores_per_instance": 2.0,
+   "client_cpu_cores_per_instance": 0.04,
+   "ms_set_pose": 0.73,
+   "ms_clock_step": 0.77,
+   "ms_wait_frame": 28.74,
+   "sim_gpus": [
+    4
+   ],
+   "cvars": "r.DynamicGlobalIlluminationMethod=0,r.ReflectionMethod=0",
+   "frames_ok": true
+  }
+ ],
+ "multi [pipelined+r.DynamicGlobalIlluminationMethod=0,r.ReflectionMethod=0,r.Shadow.Virtual.Enable=0+scan]": [
+  {
+   "instances": 1,
+   "res": "160x120",
+   "mode": "pipelined",
+   "sim_args": "",
+   "fps_total": 30.8,
+   "fps_per_instance": 30.8,
+   "fps_min": 30.8,
+   "fps_max": 30.8,
+   "gpu_util_mean": 55.0,
+   "gpu_util_max": 77.0,
+   "gpu_mem_mib_max": 1170.0,
+   "sim_cpu_cores_per_instance": 2.04,
+   "client_cpu_cores_per_instance": 0.04,
+   "ms_set_pose": 0.75,
+   "ms_clock_step": 0.62,
+   "ms_wait_frame": 30.99,
+   "sim_gpus": [
+    4
+   ],
+   "cvars": "r.DynamicGlobalIlluminationMethod=0,r.ReflectionMethod=0,r.Shadow.Virtual.Enable=0",
+   "frames_ok": true
+  }
+ ],
+ "multi [pipelined+r.DynamicGlobalIlluminationMethod=0,r.ReflectionMethod=0,r.Shadow.Virtual.Enable=0,r.ShadowQuality=0,r.BloomQuality=0,r.AntiAliasingMethod=0,r.AmbientOcclusionLevels=0,r.VolumetricFog=0,r.VolumetricCloud=0,r.MotionBlurQuality=0,r.DepthOfFieldQuality=0,r.LensFlareQuality=0,r.SceneColorFringeQuality=0,r.DistanceFieldAO=0,r.SSR.Quality=0+scan]": [
+  {
+   "instances": 1,
+   "res": "160x120",
+   "mode": "pipelined",
+   "sim_args": "",
+   "fps_total": 31.3,
+   "fps_per_instance": 31.3,
+   "fps_min": 31.3,
+   "fps_max": 31.3,
+   "gpu_util_mean": 64.5,
+   "gpu_util_max": 80.0,
+   "gpu_mem_mib_max": 1134.0,
+   "sim_cpu_cores_per_instance": 1.98,
+   "client_cpu_cores_per_instance": 0.04,
+   "ms_set_pose": 0.65,
+   "ms_clock_step": 0.56,
+   "ms_wait_frame": 30.66,
+   "sim_gpus": [
+    4
+   ],
+   "cvars": "r.DynamicGlobalIlluminationMethod=0,r.ReflectionMethod=0,r.Shadow.Virtual.Enable=0,r.ShadowQuality=0,r.BloomQuality=0,r.AntiAliasingMethod=0,r.AmbientOcclusionLevels=0,r.VolumetricFog=0,r.VolumetricCloud=0,r.MotionBlurQuality=0,r.DepthOfFieldQuality=0,r.LensFlareQuality=0,r.SceneColorFringeQuality=0,r.DistanceFieldAO=0,r.SSR.Quality=0",
+   "frames_ok": true
+  }
+ ],
+ "multi [pipelined+r.DynamicGlobalIlluminationMethod=0,r.ReflectionMethod=0,r.Shadow.Virtual.Enable=0,r.ShadowQuality=0,r.BloomQuality=0+scan]": [
+  {
+   "instances": 1,
+   "res": "160x120",
+   "mode": "pipelined",
+   "sim_args": "",
+   "fps_total": 56.5,
+   "fps_per_instance": 56.5,
+   "fps_min": 56.5,
+   "fps_max": 56.5,
+   "gpu_util_mean": 44.1,
+   "gpu_util_max": 86.0,
+   "gpu_mem_mib_max": 1083.0,
+   "sim_cpu_cores_per_instance": 2.06,
+   "client_cpu_cores_per_instance": 0.04,
+   "ms_set_pose": 0.37,
+   "ms_clock_step": 0.35,
+   "ms_wait_frame": 16.91,
+   "sim_gpus": [
+    4
+   ],
+   "cvars": "r.DynamicGlobalIlluminationMethod=0,r.ReflectionMethod=0,r.Shadow.Virtual.Enable=0,r.ShadowQuality=0,r.BloomQuality=0",
+   "frames_ok": true
+  }
+ ],
+ "multi [pipelined+r.Shadow.Virtual.Enable=0,r.ShadowQuality=0+scan]": [
+  {
+   "instances": 1,
+   "res": "160x120",
+   "mode": "pipelined",
+   "sim_args": "",
+   "fps_total": 54.6,
+   "fps_per_instance": 54.6,
+   "fps_min": 54.6,
+   "fps_max": 54.6,
+   "gpu_util_mean": 34.9,
+   "gpu_util_max": 86.0,
+   "gpu_mem_mib_max": 1083.0,
+   "sim_cpu_cores_per_instance": 2.02,
+   "client_cpu_cores_per_instance": 0.04,
+   "ms_set_pose": 0.42,
+   "ms_clock_step": 0.4,
+   "ms_wait_frame": 17.41,
+   "sim_gpus": [
+    4
+   ],
+   "cvars": "r.Shadow.Virtual.Enable=0,r.ShadowQuality=0",
+   "frames_ok": true
+  }
+ ],
+ "multi [pipelined+r.ReflectionMethod=0,r.Shadow.Virtual.Enable=0,r.ShadowQuality=0+scan]": [
+  {
+   "instances": 1,
+   "res": "160x120",
+   "mode": "pipelined",
+   "sim_args": "",
+   "fps_total": 56.9,
+   "fps_per_instance": 56.9,
+   "fps_min": 56.9,
+   "fps_max": 56.9,
+   "gpu_util_mean": 51.3,
+   "gpu_util_max": 87.0,
+   "gpu_mem_mib_max": 1083.0,
+   "sim_cpu_cores_per_instance": 2.09,
+   "client_cpu_cores_per_instance": 0.04,
+   "ms_set_pose": 0.38,
+   "ms_clock_step": 0.36,
+   "ms_wait_frame": 16.76,
+   "sim_gpus": [
+    4
+   ],
+   "cvars": "r.ReflectionMethod=0,r.Shadow.Virtual.Enable=0,r.ShadowQuality=0",
+   "frames_ok": true
+  }
+ ],
+ "multi [pipelined+r.DynamicGlobalIlluminationMethod=0,r.ReflectionMethod=0,r.Shadow.Virtual.Enable=0,r.ShadowQuality=0,r.BloomQuality=0,r.AntiAliasingMethod=0,r.AmbientOcclusionLevels=0,r.VolumetricFog=0,r.VolumetricCloud=0,r.MotionBlurQuality=0,r.DepthOfFieldQuality=0,r.LensFlareQuality=0,r.SceneColorFringeQuality=0,r.DistanceFieldAO=0,r.SSR.Quality=0,r.Nanite=0,r.GenerateMeshDistanceFields=0+scan]": [
+  {
+   "instances": 1,
+   "res": "160x120",
+   "mode": "pipelined",
+   "sim_args": "",
+   "fps_total": 63.3,
+   "fps_per_instance": 63.3,
+   "fps_min": 63.3,
+   "fps_max": 63.3,
+   "gpu_util_mean": 39.9,
+   "gpu_util_max": 85.0,
+   "gpu_mem_mib_max": 1083.0,
+   "sim_cpu_cores_per_instance": 2.06,
+   "client_cpu_cores_per_instance": 0.04,
+   "ms_set_pose": 0.4,
+   "ms_clock_step": 0.38,
+   "ms_wait_frame": 14.93,
+   "sim_gpus": [
+    4
+   ],
+   "cvars": "r.DynamicGlobalIlluminationMethod=0,r.ReflectionMethod=0,r.Shadow.Virtual.Enable=0,r.ShadowQuality=0,r.BloomQuality=0,r.AntiAliasingMethod=0,r.AmbientOcclusionLevels=0,r.VolumetricFog=0,r.VolumetricCloud=0,r.MotionBlurQuality=0,r.DepthOfFieldQuality=0,r.LensFlareQuality=0,r.SceneColorFringeQuality=0,r.DistanceFieldAO=0,r.SSR.Quality=0,r.Nanite=0,r.GenerateMeshDistanceFields=0",
+   "frames_ok": true
+  }
+ ],
+ "multi [free+r.DynamicGlobalIlluminationMethod=0,r.ReflectionMethod=0,r.Shadow.Virtual.Enable=0,r.ShadowQuality=0,r.BloomQuality=0,r.AntiAliasingMethod=0,r.AmbientOcclusionLevels=0,r.VolumetricFog=0,r.VolumetricCloud=0,r.MotionBlurQuality=0,r.DepthOfFieldQuality=0,r.LensFlareQuality=0,r.SceneColorFringeQuality=0,r.DistanceFieldAO=0,r.SSR.Quality=0,r.Nanite=0,r.GenerateMeshDistanceFields=0+scan]": [
+  {
+   "instances": 1,
+   "res": "160x120",
+   "mode": "free",
+   "sim_args": "",
+   "fps_total": 43.4,
+   "fps_per_instance": 43.4,
+   "fps_min": 43.4,
+   "fps_max": 43.4,
+   "gpu_util_mean": 51.5,
+   "gpu_util_max": 84.0,
+   "gpu_mem_mib_max": 1083.0,
+   "sim_cpu_cores_per_instance": 1.9,
+   "client_cpu_cores_per_instance": 0.03,
+   "ms_set_pose": 0.41,
+   "ms_clock_step": 0.0,
+   "ms_wait_frame": 21.68,
+   "sim_gpus": [
+    4
+   ],
+   "cvars": "r.DynamicGlobalIlluminationMethod=0,r.ReflectionMethod=0,r.Shadow.Virtual.Enable=0,r.ShadowQuality=0,r.BloomQuality=0,r.AntiAliasingMethod=0,r.AmbientOcclusionLevels=0,r.VolumetricFog=0,r.VolumetricCloud=0,r.MotionBlurQuality=0,r.DepthOfFieldQuality=0,r.LensFlareQuality=0,r.SceneColorFringeQuality=0,r.DistanceFieldAO=0,r.SSR.Quality=0,r.Nanite=0,r.GenerateMeshDistanceFields=0",
+   "frames_ok": true
+  }
+ ],
+ "multi [pipelined+r.Shadow.MaxCSMResolution=512,r.Shadow.MaxResolution=512,r.Shadow.CSM.MaxCascades=1+scan]": [
+  {
+   "instances": 1,
+   "res": "160x120",
+   "mode": "pipelined",
+   "sim_args": "",
+   "fps_total": 53.4,
+   "fps_per_instance": 53.4,
+   "fps_min": 53.4,
+   "fps_max": 53.4,
+   "gpu_util_mean": 44.9,
+   "gpu_util_max": 85.0,
+   "gpu_mem_mib_max": 1090.0,
+   "sim_cpu_cores_per_instance": 2.25,
+   "client_cpu_cores_per_instance": 0.04,
+   "ms_set_pose": 0.4,
+   "ms_clock_step": 0.39,
+   "ms_wait_frame": 17.86,
+   "sim_gpus": [
+    4
+   ],
+   "cvars": "r.Shadow.MaxCSMResolution=512,r.Shadow.MaxResolution=512,r.Shadow.CSM.MaxCascades=1",
+   "frames_ok": true
+  }
+ ],
+ "multi [pipelined+r.Shadow.DistanceScale=0.2+scan]": [
+  {
+   "instances": 1,
+   "res": "160x120",
+   "mode": "pipelined",
+   "sim_args": "",
+   "fps_total": 30.8,
+   "fps_per_instance": 30.8,
+   "fps_min": 30.8,
+   "fps_max": 30.8,
+   "gpu_util_mean": 44.9,
+   "gpu_util_max": 78.0,
+   "gpu_mem_mib_max": 1134.0,
+   "sim_cpu_cores_per_instance": 2.03,
+   "client_cpu_cores_per_instance": 0.04,
+   "ms_set_pose": 0.73,
+   "ms_clock_step": 0.61,
+   "ms_wait_frame": 31.02,
+   "sim_gpus": [
+    4
+   ],
+   "cvars": "r.Shadow.DistanceScale=0.2",
+   "frames_ok": true
+  }
+ ],
+ "multi [pipelined+r.ShadowQuality=1+scan]": [
+  {
+   "instances": 1,
+   "res": "160x120",
+   "mode": "pipelined",
+   "sim_args": "",
+   "fps_total": 30.2,
+   "fps_per_instance": 30.2,
+   "fps_min": 30.2,
+   "fps_max": 30.2,
+   "gpu_util_mean": 50.8,
+   "gpu_util_max": 81.0,
+   "gpu_mem_mib_max": 1174.0,
+   "sim_cpu_cores_per_instance": 1.85,
+   "client_cpu_cores_per_instance": 0.03,
+   "ms_set_pose": 0.6,
+   "ms_clock_step": 0.49,
+   "ms_wait_frame": 31.93,
+   "sim_gpus": [
+    4
+   ],
+   "cvars": "r.ShadowQuality=1",
+   "frames_ok": true
+  }
+ ],
+ "multi [pipelined+r.ShadowQuality=0+multi_fast]": [
+  {
+   "instances": 1,
+   "res": "160x120",
+   "mode": "pipelined",
+   "sim_args": "",
+   "fps_total": 53.6,
+   "fps_per_instance": 53.6,
+   "fps_min": 53.6,
+   "fps_max": 53.6,
+   "gpu_util_mean": 43.7,
+   "gpu_util_max": 85.0,
+   "gpu_mem_mib_max": 1083.0,
+   "sim_cpu_cores_per_instance": 2.49,
+   "client_cpu_cores_per_instance": 0.05,
+   "ms_set_pose": 0.6,
+   "ms_clock_step": 0.51,
+   "ms_wait_frame": 17.44,
+   "sim_gpus": [
+    4
+   ],
+   "cvars": "r.ShadowQuality=0",
+   "frames_ok": true
+  },
+  {
+   "instances": 2,
+   "res": "160x120",
+   "mode": "pipelined",
+   "sim_args": "",
+   "fps_total": 63.4,
+   "fps_per_instance": 31.7,
+   "fps_min": 31.4,
+   "fps_max": 32.0,
+   "gpu_util_mean": 60.5,
+   "gpu_util_max": 97.0,
+   "gpu_mem_mib_max": 2179.0,
+   "sim_cpu_cores_per_instance": 1.97,
+   "client_cpu_cores_per_instance": 0.04,
+   "ms_set_pose": 0.72,
+   "ms_clock_step": 0.57,
+   "ms_wait_frame": 29.82,
+   "sim_gpus": [
+    4
+   ],
+   "cvars": "r.ShadowQuality=0",
+   "frames_ok": true
+  },
+  {
+   "instances": 4,
+   "res": "160x120",
+   "mode": "pipelined",
+   "sim_args": "",
+   "fps_total": 67.9,
+   "fps_per_instance": 17.0,
+   "fps_min": 15.0,
+   "fps_max": 17.9,
+   "gpu_util_mean": 71.9,
+   "gpu_util_max": 99.0,
+   "gpu_mem_mib_max": 4370.0,
+   "sim_cpu_cores_per_instance": 1.58,
+   "client_cpu_cores_per_instance": 0.02,
+   "ms_set_pose": 0.66,
+   "ms_clock_step": 0.53,
+   "ms_wait_frame": 65.14,
+   "sim_gpus": [
+    4
+   ],
+   "cvars": "r.ShadowQuality=0",
+   "frames_ok": true
+  },
+  {
+   "instances": 8,
+   "res": "160x120",
+   "mode": "pipelined",
+   "sim_args": "",
+   "fps_total": 77.1,
+   "fps_per_instance": 9.6,
+   "fps_min": 8.4,
+   "fps_max": 10.3,
+   "gpu_util_mean": 85.6,
+   "gpu_util_max": 99.0,
+   "gpu_mem_mib_max": 8736.0,
+   "sim_cpu_cores_per_instance": 1.39,
+   "client_cpu_cores_per_instance": 0.02,
+   "ms_set_pose": 0.63,
+   "ms_clock_step": 0.52,
+   "ms_wait_frame": 95.46,
+   "sim_gpus": [
+    4
+   ],
+   "cvars": "r.ShadowQuality=0",
+   "frames_ok": true
+  }
+ ],
+ "multi [pipelined+multi_stock]": [
+  {
+   "instances": 1,
+   "res": "160x120",
+   "mode": "pipelined",
+   "sim_args": "",
+   "fps_total": 31.9,
+   "fps_per_instance": 31.9,
+   "fps_min": 31.9,
+   "fps_max": 31.9,
+   "gpu_util_mean": 57.8,
+   "gpu_util_max": 87.0,
+   "gpu_mem_mib_max": 1134.0,
+   "sim_cpu_cores_per_instance": 2.33,
+   "client_cpu_cores_per_instance": 0.05,
+   "ms_set_pose": 0.91,
+   "ms_clock_step": 0.68,
+   "ms_wait_frame": 29.62,
+   "sim_gpus": [
+    4
+   ],
+   "cvars": "",
+   "frames_ok": true
+  },
+  {
+   "instances": 2,
+   "res": "160x120",
+   "mode": "pipelined",
+   "sim_args": "",
+   "fps_total": 35.2,
+   "fps_per_instance": 17.6,
+   "fps_min": 17.6,
+   "fps_max": 17.6,
+   "gpu_util_mean": 72.6,
+   "gpu_util_max": 98.0,
+   "gpu_mem_mib_max": 2273.0,
+   "sim_cpu_cores_per_instance": 1.8,
+   "client_cpu_cores_per_instance": 0.03,
+   "ms_set_pose": 0.89,
+   "ms_clock_step": 0.66,
+   "ms_wait_frame": 55.21,
+   "sim_gpus": [
+    4
+   ],
+   "cvars": "",
+   "frames_ok": true
+  },
+  {
+   "instances": 4,
+   "res": "160x120",
+   "mode": "pipelined",
+   "sim_args": "",
+   "fps_total": 41.2,
+   "fps_per_instance": 10.3,
+   "fps_min": 9.6,
+   "fps_max": 11.0,
+   "gpu_util_mean": 77.0,
+   "gpu_util_max": 99.0,
+   "gpu_mem_mib_max": 4590.0,
+   "sim_cpu_cores_per_instance": 1.48,
+   "client_cpu_cores_per_instance": 0.02,
+   "ms_set_pose": 0.78,
+   "ms_clock_step": 0.57,
+   "ms_wait_frame": 95.56,
+   "sim_gpus": [
+    4
+   ],
+   "cvars": "",
+   "frames_ok": true
+  },
+  {
+   "instances": 8,
+   "res": "160x120",
+   "mode": "pipelined",
+   "sim_args": "",
+   "fps_total": 45.8,
+   "fps_per_instance": 5.7,
+   "fps_min": 4.6,
+   "fps_max": 6.2,
+   "gpu_util_mean": 90.4,
+   "gpu_util_max": 99.0,
+   "gpu_mem_mib_max": 9096.0,
+   "sim_cpu_cores_per_instance": 1.29,
+   "client_cpu_cores_per_instance": 0.01,
+   "ms_set_pose": 0.64,
+   "ms_clock_step": 0.51,
+   "ms_wait_frame": 164.05,
+   "sim_gpus": [
+    4
+   ],
+   "cvars": "",
+   "frames_ok": true
+  }
+ ],
+ "throughput [free+r.ShadowQuality=0,r.OneFrameThreadLag=0+gpu5]": [
+  {
+   "instances": 1,
+   "res": "64x64",
+   "mode": "free",
+   "sim_args": "",
+   "fps_total": 74.5,
+   "fps_per_instance": 74.5,
+   "fps_min": 74.5,
+   "fps_max": 74.5,
+   "gpu_util_mean": 42.1,
+   "gpu_util_max": 80.0,
+   "gpu_mem_mib_max": 1083.0,
+   "sim_cpu_cores_per_instance": 1.86,
+   "client_cpu_cores_per_instance": 0.04,
+   "ms_set_pose": 0.46,
+   "ms_clock_step": 0.0,
+   "ms_wait_frame": 12.53,
+   "sim_gpus": [
+    5
+   ],
+   "cvars": "r.ShadowQuality=0,r.OneFrameThreadLag=0",
+   "frames_ok": true
+  },
+  {
+   "instances": 1,
+   "res": "160x120",
+   "mode": "free",
+   "sim_args": "",
+   "fps_total": 85.4,
+   "fps_per_instance": 85.4,
+   "fps_min": 85.4,
+   "fps_max": 85.4,
+   "gpu_util_mean": 39.9,
+   "gpu_util_max": 83.0,
+   "gpu_mem_mib_max": 1083.0,
+   "sim_cpu_cores_per_instance": 1.85,
+   "client_cpu_cores_per_instance": 0.04,
+   "ms_set_pose": 0.36,
+   "ms_clock_step": 0.0,
+   "ms_wait_frame": 10.99,
+   "sim_gpus": [
+    5
+   ],
+   "cvars": "r.ShadowQuality=0,r.OneFrameThreadLag=0",
+   "frames_ok": true
+  },
+  {
+   "instances": 1,
+   "res": "320x240",
+   "mode": "free",
+   "sim_args": "",
+   "fps_total": 79.8,
+   "fps_per_instance": 79.8,
+   "fps_min": 79.8,
+   "fps_max": 79.8,
+   "gpu_util_mean": 33.7,
+   "gpu_util_max": 85.0,
+   "gpu_mem_mib_max": 1087.0,
+   "sim_cpu_cores_per_instance": 1.88,
+   "client_cpu_cores_per_instance": 0.05,
+   "ms_set_pose": 0.38,
+   "ms_clock_step": 0.0,
+   "ms_wait_frame": 11.77,
+   "sim_gpus": [
+    5
+   ],
+   "cvars": "r.ShadowQuality=0,r.OneFrameThreadLag=0",
+   "frames_ok": true
+  }
+ ],
+ "multi [free+r.ShadowQuality=0,r.OneFrameThreadLag=0+multi_free]": [
+  {
+   "instances": 1,
+   "res": "160x120",
+   "mode": "free",
+   "sim_args": "",
+   "fps_total": 77.9,
+   "fps_per_instance": 77.9,
+   "fps_min": 77.9,
+   "fps_max": 77.9,
+   "gpu_util_mean": 43.2,
+   "gpu_util_max": 81.0,
+   "gpu_mem_mib_max": 1083.0,
+   "sim_cpu_cores_per_instance": 2.32,
+   "client_cpu_cores_per_instance": 0.05,
+   "ms_set_pose": 0.55,
+   "ms_clock_step": 0.0,
+   "ms_wait_frame": 11.87,
+   "sim_gpus": [
+    4
+   ],
+   "cvars": "r.ShadowQuality=0,r.OneFrameThreadLag=0",
+   "frames_ok": true
+  },
+  {
+   "instances": 2,
+   "res": "160x120",
+   "mode": "free",
+   "sim_args": "",
+   "fps_total": 93.5,
+   "fps_per_instance": 46.8,
+   "fps_min": 46.3,
+   "fps_max": 47.2,
+   "gpu_util_mean": 58.6,
+   "gpu_util_max": 97.0,
+   "gpu_mem_mib_max": 2179.0,
+   "sim_cpu_cores_per_instance": 1.93,
+   "client_cpu_cores_per_instance": 0.04,
+   "ms_set_pose": 0.71,
+   "ms_clock_step": 0.0,
+   "ms_wait_frame": 19.8,
+   "sim_gpus": [
+    4
+   ],
+   "cvars": "r.ShadowQuality=0,r.OneFrameThreadLag=0",
+   "frames_ok": true
+  },
+  {
+   "instances": 4,
+   "res": "160x120",
+   "mode": "free",
+   "sim_args": "",
+   "fps_total": 105.5,
+   "fps_per_instance": 26.4,
+   "fps_min": 25.5,
+   "fps_max": 26.8,
+   "gpu_util_mean": 75.4,
+   "gpu_util_max": 99.0,
+   "gpu_mem_mib_max": 4370.0,
+   "sim_cpu_cores_per_instance": 1.56,
+   "client_cpu_cores_per_instance": 0.03,
+   "ms_set_pose": 0.67,
+   "ms_clock_step": 0.0,
+   "ms_wait_frame": 35.83,
+   "sim_gpus": [
+    4
+   ],
+   "cvars": "r.ShadowQuality=0,r.OneFrameThreadLag=0",
+   "frames_ok": true
+  },
+  {
+   "instances": 8,
+   "res": "160x120",
+   "mode": "free",
+   "sim_args": "",
+   "fps_total": 123.7,
+   "fps_per_instance": 15.5,
+   "fps_min": 10.0,
+   "fps_max": 17.0,
+   "gpu_util_mean": 88.4,
+   "gpu_util_max": 99.0,
+   "gpu_mem_mib_max": 8728.0,
+   "sim_cpu_cores_per_instance": 1.35,
+   "client_cpu_cores_per_instance": 0.02,
+   "ms_set_pose": 0.65,
+   "ms_clock_step": 0.0,
+   "ms_wait_frame": 56.97,
+   "sim_gpus": [
+    4
+   ],
+   "cvars": "r.ShadowQuality=0,r.OneFrameThreadLag=0",
+   "frames_ok": true
+  }
+ ],
+ "multi [free+r.DynamicGlobalIlluminationMethod=0,r.ReflectionMethod=0,r.Shadow.Virtual.Enable=0,r.ShadowQuality=0,r.BloomQuality=0,r.AntiAliasingMethod=0,r.AmbientOcclusionLevels=0,r.VolumetricFog=0,r.VolumetricCloud=0,r.MotionBlurQuality=0,r.DepthOfFieldQuality=0,r.LensFlareQuality=0,r.SceneColorFringeQuality=0,r.DistanceFieldAO=0,r.SSR.Quality=0,r.Nanite=0,r.GenerateMeshDistanceFields=0,r.OneFrameThreadLag=0+max]": [
+  {
+   "instances": 1,
+   "res": "160x120",
+   "mode": "free",
+   "sim_args": "",
+   "fps_total": 85.6,
+   "fps_per_instance": 85.6,
+   "fps_min": 85.6,
+   "fps_max": 85.6,
+   "gpu_util_mean": 45.2,
+   "gpu_util_max": 84.0,
+   "gpu_mem_mib_max": 1083.0,
+   "sim_cpu_cores_per_instance": 2.26,
+   "client_cpu_cores_per_instance": 0.05,
+   "ms_set_pose": 0.53,
+   "ms_clock_step": 0.0,
+   "ms_wait_frame": 10.7,
+   "sim_gpus": [
+    4
+   ],
+   "cvars": "r.DynamicGlobalIlluminationMethod=0,r.ReflectionMethod=0,r.Shadow.Virtual.Enable=0,r.ShadowQuality=0,r.BloomQuality=0,r.AntiAliasingMethod=0,r.AmbientOcclusionLevels=0,r.VolumetricFog=0,r.VolumetricCloud=0,r.MotionBlurQuality=0,r.DepthOfFieldQuality=0,r.LensFlareQuality=0,r.SceneColorFringeQuality=0,r.DistanceFieldAO=0,r.SSR.Quality=0,r.Nanite=0,r.GenerateMeshDistanceFields=0,r.OneFrameThreadLag=0",
+   "frames_ok": true
+  },
+  {
+   "instances": 2,
+   "res": "160x120",
+   "mode": "free",
+   "sim_args": "",
+   "fps_total": 96.4,
+   "fps_per_instance": 48.2,
+   "fps_min": 46.1,
+   "fps_max": 50.3,
+   "gpu_util_mean": 52.6,
+   "gpu_util_max": 97.0,
+   "gpu_mem_mib_max": 2171.0,
+   "sim_cpu_cores_per_instance": 1.94,
+   "client_cpu_cores_per_instance": 0.04,
+   "ms_set_pose": 0.65,
+   "ms_clock_step": 0.0,
+   "ms_wait_frame": 18.52,
+   "sim_gpus": [
+    4
+   ],
+   "cvars": "r.DynamicGlobalIlluminationMethod=0,r.ReflectionMethod=0,r.Shadow.Virtual.Enable=0,r.ShadowQuality=0,r.BloomQuality=0,r.AntiAliasingMethod=0,r.AmbientOcclusionLevels=0,r.VolumetricFog=0,r.VolumetricCloud=0,r.MotionBlurQuality=0,r.DepthOfFieldQuality=0,r.LensFlareQuality=0,r.SceneColorFringeQuality=0,r.DistanceFieldAO=0,r.SSR.Quality=0,r.Nanite=0,r.GenerateMeshDistanceFields=0,r.OneFrameThreadLag=0",
+   "frames_ok": true
+  }
+ ],
+ "throughput [free+r.ShadowQuality=0,r.OneFrameThreadLag=0+final]": [
+  {
+   "instances": 1,
+   "res": "64x64",
+   "mode": "free",
+   "sim_args": "",
+   "fps_total": 82.2,
+   "fps_per_instance": 82.2,
+   "fps_min": 82.2,
+   "fps_max": 82.2,
+   "gpu_util_mean": 49.7,
+   "gpu_util_max": 81.0,
+   "gpu_mem_mib_max": 1083.0,
+   "sim_cpu_cores_per_instance": 1.88,
+   "client_cpu_cores_per_instance": 0.04,
+   "ms_set_pose": 0.41,
+   "ms_clock_step": 0.0,
+   "ms_wait_frame": 11.37,
+   "sim_gpus": [
+    4
+   ],
+   "cvars": "r.ShadowQuality=0,r.OneFrameThreadLag=0",
+   "frames_ok": true
+  },
+  {
+   "instances": 1,
+   "res": "160x120",
+   "mode": "free",
+   "sim_args": "",
+   "fps_total": 78.0,
+   "fps_per_instance": 78.0,
+   "fps_min": 78.0,
+   "fps_max": 78.0,
+   "gpu_util_mean": 46.7,
+   "gpu_util_max": 80.0,
+   "gpu_mem_mib_max": 1083.0,
+   "sim_cpu_cores_per_instance": 1.88,
+   "client_cpu_cores_per_instance": 0.05,
+   "ms_set_pose": 0.48,
+   "ms_clock_step": 0.0,
+   "ms_wait_frame": 11.92,
+   "sim_gpus": [
+    4
+   ],
+   "cvars": "r.ShadowQuality=0,r.OneFrameThreadLag=0",
+   "frames_ok": true
+  },
+  {
+   "instances": 1,
+   "res": "320x240",
+   "mode": "free",
+   "sim_args": "",
+   "fps_total": 68.2,
+   "fps_per_instance": 68.2,
+   "fps_min": 68.2,
+   "fps_max": 68.2,
+   "gpu_util_mean": 44.2,
+   "gpu_util_max": 76.0,
+   "gpu_mem_mib_max": 1083.0,
+   "sim_cpu_cores_per_instance": 1.85,
+   "client_cpu_cores_per_instance": 0.05,
+   "ms_set_pose": 0.53,
+   "ms_clock_step": 0.0,
+   "ms_wait_frame": 13.69,
+   "sim_gpus": [
+    4
+   ],
+   "cvars": "r.ShadowQuality=0,r.OneFrameThreadLag=0",
+   "frames_ok": true
+  }
+ ],
+ "sync_5000_steps [free+r.ShadowQuality=0,r.OneFrameThreadLag=0]": {
+  "ref_gap_mean_abs": 40.68,
+  "pipelined/alternate": {
+   "frames": 5000,
+   "wrong_view_frames": 0,
+   "failure_rate": 0.0,
+   "messages_received": 5001,
+   "stray_messages": 0,
+   "match_rate_if_lag1": 0.0,
+   "match_rate_if_lag2": 1.0,
+   "mean_abs_diff_to_own_ref": 0.297,
+   "max_abs_diff_to_own_ref": 0.35
+  },
+  "pipelined/random": {
+   "frames": 5000,
+   "wrong_view_frames": 0,
+   "failure_rate": 0.0,
+   "messages_received": 5001,
+   "stray_messages": 0,
+   "match_rate_if_lag1": 0.5,
+   "match_rate_if_lag2": 0.484,
+   "mean_abs_diff_to_own_ref": 0.297,
+   "max_abs_diff_to_own_ref": 0.35
+  },
+  "free_running/alternate": {
+   "frames": 5000,
+   "wrong_view_frames": 0,
+   "failure_rate": 0.0,
+   "messages_received": 5003,
+   "stray_messages": 0,
+   "match_rate_if_lag1": 0.0,
+   "match_rate_if_lag2": 1.0,
+   "mean_abs_diff_to_own_ref": 0.297,
+   "max_abs_diff_to_own_ref": 0.35
+  },
+  "free_running/random": {
+   "frames": 5000,
+   "wrong_view_frames": 0,
+   "failure_rate": 0.0,
+   "messages_received": 5002,
+   "stray_messages": 0,
+   "match_rate_if_lag1": 0.5,
+   "match_rate_if_lag2": 0.484,
+   "mean_abs_diff_to_own_ref": 0.297,
+   "max_abs_diff_to_own_ref": 0.35
+  }
+ }
+}
