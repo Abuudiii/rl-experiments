@@ -81,6 +81,13 @@ evaluation pass per track in Unreal, 30 s episodes, randomised drone physics, ga
 completes three laps in every one of the same episodes. The tuned checkpoint was fixed on a separate selection seed
 before the final pass. On the hairpin track 31 of 35 crashes are on the leg right after the hairpin.
 
+![Three-lap rate by track](figures/post/three_lap_rate_by_track.png)
+
+![Stick error against the teacher over the fine-tuning rounds](figures/post/dagger_rounds.png)
+
+Stick error after each fine-tuning round is measured on 8 flights, so it is a trend; the published checkpoint is
+round 4, the one checked on the selection seed.
+
 ![Tuned student on the figure-8](figures/figure8_student.gif)
 
 ![Tuned student on the climb-and-dive](figures/climb_dive_student.gif)
