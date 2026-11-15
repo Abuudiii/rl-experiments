@@ -122,13 +122,33 @@ def make_train_step(cfg: StudentConfig, total_steps: int, warmup: int = 200, lr:
     return opt, step, evaluate
 
 
+def retry_quota(fn, tries: int = 6, pause_s: float = 30.0):
+    """Run ``fn()``; on "disk quota exceeded" (errno 122, network home) wait and try again."""
+    import errno
+    import time
+
+    for i in range(tries):
+        try:
+            return fn()
+        except OSError as e:
+            if e.errno != errno.EDQUOT or i == tries - 1:
+                raise
+            print(f"disk quota exceeded, retry {i + 1}/{tries - 1} in {pause_s:.0f} s", flush=True)
+            time.sleep(pause_s)
+
+
 def save_student(path, params, cfg: StudentConfig, extra: dict | None = None):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     ckpt = dict(params=jax.tree_util.tree_map(np.asarray, params), config=dataclasses.asdict(cfg), **(extra or {}))
     tmp = path.with_suffix(".tmp")
-    tmp.write_bytes(pickle.dumps(ckpt))
-    tmp.rename(path)
+    data = pickle.dumps(ckpt)
+
+    def write():
+        tmp.write_bytes(data)
+        tmp.rename(path)
+
+    retry_quota(write)
 
 
 def load_student(path):

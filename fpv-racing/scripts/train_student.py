@@ -34,6 +34,9 @@ def main():
     ap.add_argument("--steps", type=int, default=20000)
     ap.add_argument("--recent-weight", type=float, default=1.0)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--relabel", default=None, help="teacher checkpoint whose actions replace the stored labels")
+    ap.add_argument("--extra-data", nargs="*", default=[], help="other data dirs (e.g. another renderer)")
+    ap.add_argument("--extra-frac", type=float, default=0.25, help="share of each batch drawn from --extra-data")
     dagger.add_student_args(ap)
     args = ap.parse_args()
     log = lambda m: print(f"[{time.strftime('%H:%M:%S')}] {m}", flush=True)  # noqa: E731
@@ -44,15 +47,17 @@ def main():
         cfg = dagger.cfg_from_args(args)
         _, params = st.init_params(cfg, args.seed)
     rounds = None if args.rounds is None else {int(r) for r in args.rounds.split(",")}
-    data = dagger.Dataset()
+    data = dagger.Dataset(relabel=args.relabel)
+    for d in args.extra_data:
+        data.add_dir(d, extra=True)
     for d in args.data:
         data.add_dir(d, rounds)
-    h, w = data.blocks[0].frames.shape[1:3]
+    h, w = data.blocks[-1].frames.shape[1:3]
     assert (h, w) == (cfg.height, cfg.width), f"shards are {w}x{h}, student wants {cfg.width}x{cfg.height}"
     log(f"{len(data)} frames by round {data.sizes()}; student {st.n_params(params) / 1e6:.2f} M parameters")
     t0 = time.time()
     params, hist = dagger.train(cfg, params, data, args.steps, seed=args.seed, lr=args.lr if args.init else None,
-                                log=log, recent_weight=args.recent_weight)  # fmt: skip
+                                log=log, recent_weight=args.recent_weight, extra_frac=args.extra_frac)  # fmt: skip
     st.save_student(args.out, params, cfg, dict(train=hist, data=[str(d) for d in args.data]))
     Path(args.out).with_suffix(".train.json").write_text(
         json.dumps(dict(config=dataclasses.asdict(cfg), frames=len(data), by_round=data.sizes(), history=hist,

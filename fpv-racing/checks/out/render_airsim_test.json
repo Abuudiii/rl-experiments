@@ -19,12 +19,16 @@
    "stock",
    "fast"
   ],
-  "skip": []
+  "skip": [],
+  "third_person": false,
+  "tp_ipg": 2,
+  "startup_trials": 0,
+  "startup_ipg": 6
  },
  "bad_gpu_error": "GPU(s) [99] not available on this machine (nvidia-smi lists [0, 1, 2, 3, 4, 5])",
  "startup_s": {
   "slots": 16,
-  "seconds": 41.4
+  "seconds": 42.8
  },
  "rollout_geometry": {
   "rollouts": "runs/teacher/cruise_s1/rollouts.npz",
@@ -54,14 +58,14 @@
   "of_those_with_a_gate_bar_crossing_the_camera_plane": 57,
   "set_gates": [
    {
-    "wall_ms_all_slots": 18.4,
-    "worker_ms_per_slot_mean": 14.6,
-    "worker_ms_per_slot_max": 17.6
+    "wall_ms_all_slots": 25.2,
+    "worker_ms_per_slot_mean": 15.2,
+    "worker_ms_per_slot_max": 20.8
    },
    {
-    "wall_ms_all_slots": 17.5,
-    "worker_ms_per_slot_mean": 13.1,
-    "worker_ms_per_slot_max": 16.7
+    "wall_ms_all_slots": 31.4,
+    "worker_ms_per_slot_mean": 19.1,
+    "worker_ms_per_slot_max": 30.1
    }
   ],
   "worst_cases": [
@@ -122,7 +126,7 @@
    "first_mismatches": [],
    "max_abs_diff_to_own_reference": 0.504,
    "restarts": 0,
-   "seconds": 786.1
+   "seconds": 719.1
   },
   "render_masked": {
    "steps": 200,
@@ -135,13 +139,13 @@
    "mismatched_frames": 0,
    "max_abs_diff_to_own_reference": 0.512,
    "restarts": 0,
-   "seconds": 356.7
+   "seconds": 340.7
   }
  },
  "watchdog": {
   "killed_slot": 8,
   "restarts": 1,
-  "recovery_s": 14.5,
+  "recovery_s": 21.5,
   "frame_mean_abs_diff_after_restart": 0.341,
   "other_slots_mean_abs_diff": 0.347
  },
@@ -155,22 +159,22 @@
    "instances_per_gpu": 8,
    "slots": 16,
    "res": "320x180",
-   "render_step_ms_mean": 404.5,
-   "render_step_ms_median": 384.0,
-   "render_step_ms_mean_while_polling_nvidia_smi": 390.4,
-   "render_step_ms_p95": 624.0,
-   "render_frames_per_s": 39.6,
-   "render_step_ms_half_slots_active": 497.5,
-   "render_trajectories_frames_per_s": 90.4,
+   "render_step_ms_mean": 372.8,
+   "render_step_ms_median": 352.3,
+   "render_step_ms_mean_while_polling_nvidia_smi": 362.0,
+   "render_step_ms_p95": 504.5,
+   "render_frames_per_s": 42.9,
+   "render_step_ms_half_slots_active": 480.2,
+   "render_trajectories_frames_per_s": 92.4,
    "gpu_util_mean_per_gpu": [
-    86.9,
-    91.7
+    92.4,
+    91.4
    ],
    "gpu_mem_mib_per_gpu": [
-    9360.0,
-    9360.0
+    9396.0,
+    9401.0
    ],
-   "cpu_cores_per_slot": 1.26,
+   "cpu_cores_per_slot": 0.88,
    "restarts": 1
   },
   {
@@ -182,22 +186,22 @@
    "instances_per_gpu": 4,
    "slots": 8,
    "res": "320x180",
-   "render_step_ms_mean": 209.1,
-   "render_step_ms_median": 199.8,
-   "render_step_ms_mean_while_polling_nvidia_smi": 208.7,
-   "render_step_ms_p95": 364.4,
-   "render_frames_per_s": 38.3,
-   "render_step_ms_half_slots_active": 271.2,
-   "render_trajectories_frames_per_s": 80.6,
+   "render_step_ms_mean": 190.5,
+   "render_step_ms_median": 169.8,
+   "render_step_ms_mean_while_polling_nvidia_smi": 192.5,
+   "render_step_ms_p95": 268.1,
+   "render_frames_per_s": 42.0,
+   "render_step_ms_half_slots_active": 242.7,
+   "render_trajectories_frames_per_s": 92.4,
    "gpu_util_mean_per_gpu": [
-    81.4,
-    77.7
+    80.7,
+    83.1
    ],
    "gpu_mem_mib_per_gpu": [
-    4530.0,
-    4526.0
+    4574.0,
+    4650.0
    ],
-   "cpu_cores_per_slot": 1.44,
+   "cpu_cores_per_slot": 1.35,
    "restarts": 0
   },
   {
@@ -209,22 +213,22 @@
    "instances_per_gpu": 4,
    "slots": 8,
    "res": "320x180",
-   "render_step_ms_mean": 161.5,
-   "render_step_ms_median": 139.3,
-   "render_step_ms_mean_while_polling_nvidia_smi": 167.0,
-   "render_step_ms_p95": 273.9,
-   "render_frames_per_s": 49.5,
-   "render_step_ms_half_slots_active": 190.2,
-   "render_trajectories_frames_per_s": 118.9,
+   "render_step_ms_mean": 129.9,
+   "render_step_ms_median": 104.6,
+   "render_step_ms_mean_while_polling_nvidia_smi": 135.8,
+   "render_step_ms_p95": 216.5,
+   "render_frames_per_s": 61.6,
+   "render_step_ms_half_slots_active": 167.2,
+   "render_trajectories_frames_per_s": 139.5,
    "gpu_util_mean_per_gpu": [
-    76.5,
-    63.5
+    75.5,
+    76.5
    ],
    "gpu_mem_mib_per_gpu": [
-    4338.0,
-    4334.0
+    4335.0,
+    4335.0
    ],
-   "cpu_cores_per_slot": 1.55,
+   "cpu_cores_per_slot": 1.46,
    "restarts": 0
   },
   {
@@ -236,24 +240,25 @@
    "instances_per_gpu": 8,
    "slots": 16,
    "res": "320x180",
-   "render_step_ms_mean": 270.7,
-   "render_step_ms_median": 239.8,
-   "render_step_ms_mean_while_polling_nvidia_smi": 270.1,
-   "render_step_ms_p95": 438.1,
-   "render_frames_per_s": 59.1,
-   "render_step_ms_half_slots_active": 384.5,
-   "render_trajectories_frames_per_s": 125.4,
+   "render_step_ms_mean": 257.4,
+   "render_step_ms_median": 247.6,
+   "render_step_ms_mean_while_polling_nvidia_smi": 258.8,
+   "render_step_ms_p95": 411.2,
+   "render_frames_per_s": 62.2,
+   "render_step_ms_half_slots_active": 353.5,
+   "render_trajectories_frames_per_s": 136.8,
    "gpu_util_mean_per_gpu": [
-    90.7,
-    90.2
+    87.8,
+    88.6
    ],
    "gpu_mem_mib_per_gpu": [
-    8680.0,
-    8672.0
+    8665.0,
+    8665.0
    ],
-   "cpu_cores_per_slot": 1.39,
+   "cpu_cores_per_slot": 0.92,
    "restarts": 0
   }
  ],
- "sim_processes_left_after_close": 0
+ "sim_processes_left_after_close": 0,
+ "scratch_left_after_close": 0
 }

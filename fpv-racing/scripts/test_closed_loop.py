@@ -1,12 +1,16 @@
 """Tests of `fpv.closed_loop.FlightBatch`.
 
     CUDA_VISIBLE_DEVICES=0 .venv-sim/bin/python scripts/test_closed_loop.py runs/teacher/<run>/ckpt_latest.pkl
+    CUDA_VISIBLE_DEVICES=0 .venv-sim/bin/python scripts/test_closed_loop.py <ckpt> --scenario figure8
     JAX_PLATFORMS=cpu      .venv-sim/bin/python scripts/test_closed_loop.py <ckpt> --latency-only
 
 (i)   n=256, feed back ``teacher_action`` for one full episode: must reproduce the teacher's
       evaluation (gates per episode, crashes).
-(ii)  ``teacher_action`` + Gaussian noise (std 0.3), resetting finished environments: crash rate,
-      labels finite; plus API checks (frozen after done, partial reset, wide spawn).
+(ii)  ``teacher_action`` + Gaussian noise (std 0.1 / 0.2 / 0.3), resetting finished environments:
+      crashes per flight-minute, labels finite; plus API checks (frozen after done, partial reset,
+      wide spawn, fixed scenario layouts).
+(i) and (ii) fly the checkpoint's training distribution, or ``--scenario`` (a name in
+fpv.track.SCENARIOS) with its per-gate and physics randomisation.
 (iii) ``step`` latency for n = 16, 64, 256 on the current device.
 Prints one JSON line starting with ``RESULT``.
 """
@@ -42,8 +46,8 @@ def check_state(s, n):
     return bool(np.isfinite(s["teacher_action"]).all() and np.isfinite(s["teacher_obs"]).all())
 
 
-def test_teacher(ckpt, n=256):
-    fb = FlightBatch(n, ckpt, seed=0)
+def test_teacher(ckpt, n=256, scenario=None):
+    fb = FlightBatch(n, ckpt, seed=0, scenario=scenario)
     s = fb.reset()
     finite = check_state(s, n)
     assert not s["done"].any() and (s["t"] == 0).all()
@@ -62,8 +66,8 @@ def test_teacher(ckpt, n=256):
     )  # fmt: skip
 
 
-def test_noise(ckpt, n=256, steps=3000, std=0.3, wide=0.0):
-    fb = FlightBatch(n, ckpt, seed=1, wide_spawn_p=wide)
+def test_noise(ckpt, n=256, steps=3000, std=0.3, wide=0.0, scenario=None):
+    fb = FlightBatch(n, ckpt, seed=1, wide_spawn_p=wide, scenario=scenario)
     rng = np.random.default_rng(0)
     s = fb.reset()
     finite, episodes, crashes, gates, flown = True, 0, np.zeros(4, int), 0, 0
@@ -104,13 +108,18 @@ def test_api(ckpt, n=16):
     untouched = all(np.array_equal(r[k][~mask], s[k][~mask]) for k in SHAPES)
     fresh = bool((~r["done"][mask]).all() and (r["t"][mask] == 0).all() and (r["outcome"][mask] == 0).all())
     new_layout = bool((np.abs(r["gates_pos"][mask] - s["gates_pos"][mask]).max(axis=(1, 2)) > 0).all())
-    nominal = FlightBatch(n, ckpt, seed=3, randomize=False).reset()
     from fpv import track
 
-    nominal_ok = bool(np.allclose(nominal["gates_pos"], track.circuit_arrays()[0]))
+    nominal_ok = {}
+    for name in track.SCENARIOS:
+        nominal = FlightBatch(n, ckpt, seed=3, randomize=False, scenario=name).reset()
+        nominal_ok[name] = bool(np.allclose(nominal["gates_pos"], track.circuit_arrays(track.SCENARIOS[name])[0]))
+    rand = FlightBatch(n, ckpt, seed=3, randomize=True, scenario="figure8").reset()
+    off = np.abs(rand["gates_pos"] - track.circuit_arrays(track.SCENARIOS["figure8"])[0]).max()
     wide = FlightBatch(256, ckpt, seed=4, wide_spawn_p=1.0).reset()
     return dict(frozen_after_done=same, partial_reset_untouched=untouched, reset_fresh=fresh,
                 reset_new_layout=new_layout, nominal_layout=nominal_ok,
+                scenario_randomised_offset_max=float(off),
                 wide_spawn_speed_max=float(np.linalg.norm(wide["vel"], axis=-1).max()),
                 wide_spawn_labels_finite=bool(np.isfinite(wide["teacher_action"]).all()))  # fmt: skip
 
@@ -138,13 +147,14 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("checkpoint")
     ap.add_argument("--latency-only", action="store_true")
+    ap.add_argument("--scenario", default=None, help="fly this named layout (default: the training distribution)")
     args = ap.parse_args()
-    res = {"device": str(jax.devices()[0]), "checkpoint": args.checkpoint}
+    res = {"device": str(jax.devices()[0]), "checkpoint": args.checkpoint, "scenario": args.scenario}
     if not args.latency_only:
-        res["teacher_feedback"] = test_teacher(args.checkpoint)
+        res["teacher_feedback"] = test_teacher(args.checkpoint, scenario=args.scenario)
         print("(i)", res["teacher_feedback"], flush=True)
         for std in (0.1, 0.2, 0.3):
-            res[f"noise_{std}"] = test_noise(args.checkpoint, std=std)
+            res[f"noise_{std}"] = test_noise(args.checkpoint, std=std, scenario=args.scenario)
             print(f"(ii) noise std {std}", res[f"noise_{std}"], flush=True)
         res["api"] = test_api(args.checkpoint)
         print("api", res["api"], flush=True)

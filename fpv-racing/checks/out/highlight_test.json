@@ -1,0 +1,101 @@
+{
+ "args": {
+  "gpus": [
+   5
+  ],
+  "ipg": 8,
+  "res": "320x180",
+  "sync_steps": 2000,
+  "traj_steps": 2000,
+  "rollouts": "runs/teacher/cruise_s1/rollouts.npz",
+  "throughput_steps": 100,
+  "rollout_rounds": 2,
+  "throughput_ipg": [
+   4,
+   8
+  ],
+  "looks": [
+   "stock",
+   "fast"
+  ],
+  "skip": [],
+  "third_person": false,
+  "tp_ipg": 2,
+  "startup_trials": 0,
+  "startup_ipg": 6,
+  "highlight": [
+   0.0,
+   1.0,
+   0.0
+  ],
+  "startup_inject_only": false
+ },
+ "renderer": {
+  "gpus": [
+   5
+  ],
+  "instances_per_gpu": 2,
+  "size": [
+   320,
+   180
+  ],
+  "highlight_rgb": [
+   0.0,
+   1.0,
+   0.0
+  ]
+ },
+ "render_trajectories_random_target": {
+  "frames": 600,
+  "target_clearly_visible": 187,
+  "frames_wrong": 0,
+  "frames_highlight_on_previous_target": 0,
+  "target_highlight_coverage_median_p5": [
+   0.89,
+   0.793
+  ],
+  "target_magenta_frac_max": 0.001,
+  "first_wrong": []
+ },
+ "render_random_target": {
+  "frames": 160,
+  "target_clearly_visible": 44,
+  "frames_wrong": 0,
+  "frames_highlight_on_previous_target": 0,
+  "target_highlight_coverage_median_p5": [
+   0.901,
+   0.778
+  ],
+  "target_magenta_frac_max": 0.001,
+  "first_wrong": []
+ },
+ "render_trajectories_flight_target": {
+  "frames": 600,
+  "target_clearly_visible": 596,
+  "frames_wrong": 0,
+  "frames_highlight_on_previous_target": 0,
+  "target_highlight_coverage_median_p5": [
+   0.929,
+   0.853
+  ],
+  "target_magenta_frac_max": 0.005,
+  "first_wrong": []
+ },
+ "render_trajectories_frames_per_s": {
+  "no_target": 21.2,
+  "constant_target": 20.4,
+  "target_every_frame": 21.7,
+  "flight_target": 26.0
+ },
+ "render_ms_per_step": {
+  "no_target": 155.7,
+  "target_every_frame": 161.4
+ },
+ "changes_per_frame": {
+  "target_every_frame": 0.851,
+  "flight_target": 0.0234
+ },
+ "restarts": 0,
+ "pass": true,
+ "sim_processes_left_after_close": 0
+}

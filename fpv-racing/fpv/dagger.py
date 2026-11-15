@@ -11,6 +11,13 @@ consecutive steps of the n parallel slots of one `fly` call:
     teacher_obs [43] (privileged; auxiliary targets), pos, quat, vel, gates_pos, gates_yaw, target,
     t (step in the episode; 0 = first frame), ep (episode counter of the slot), by_teacher (who
     flew this step), valid (False once a slot's episode is over and it is not reset).
+``<data>/seeds.jsonl`` records, per `fly` call, the `FlightBatch` seed (and scenario) that produced it,
+so that an evaluation can prove its seed was never used for training data (`data_seeds`). A
+directory holding ``NOT_TRAINING_DATA`` (evaluation flights kept for failure analysis) is refused
+by `Dataset.add_dir`.
+
+Labels can be recomputed with another teacher: they are a function of the stored ``teacher_obs``
+(`fpv.env.teacher_obs` of the state), see ``Dataset(relabel=<teacher checkpoint>)``.
 """
 
 from __future__ import annotations
@@ -28,39 +35,208 @@ import numpy as np
 from fpv import student as st
 
 OUTCOMES = ("time_limit", "gate_crash", "ground", "out_of_bounds")
+CRASH_T_EDGES = (0, 2, 4, 8, 12, 16, 20, 30)
 REC_FIELDS = ("frames", "label", "action", "prev_action", "teacher_obs", "pos", "quat", "vel", "gates_pos",
               "gates_yaw", "target", "t", "ep", "by_teacher", "valid")  # fmt: skip
 
 
+class FlightBatchGroup:
+    """Several `fpv.closed_loop.FlightBatch` (e.g. one per named layout) flown as one batch of
+    ``sum(n)`` slots: same ``reset(mask)`` / ``step(actions)`` interface, outputs concatenated."""
+
+    def __init__(self, batches):
+        self.batches = list(batches)
+        self.n = sum(b.n for b in self.batches)
+        self.cfg = self.batches[0].cfg
+        self._cut = np.cumsum([0] + [b.n for b in self.batches])
+
+    def _parts(self, x):
+        return [None if x is None else x[a:b] for a, b in zip(self._cut[:-1], self._cut[1:])]
+
+    @staticmethod
+    def _cat(outs):
+        return {k: np.concatenate([o[k] for o in outs]) for k in outs[0]}
+
+    def reset(self, mask=None):
+        mask = None if mask is None else np.asarray(mask, bool)
+        return self._cat([b.reset(m) for b, m in zip(self.batches, self._parts(mask))])
+
+    def step(self, actions):
+        return self._cat([b.step(a) for b, a in zip(self.batches, self._parts(np.asarray(actions)))])
+
+
+def hairpin_s_tracks(n: int, seed: int, delta=(0.35, 0.9), s_min_deg: float = 25.0, turn_min_deg: float = 60.0,
+                     max_batches: int = 64, stats: dict | None = None):  # fmt: skip
+    """``n`` random tracks (pos (n, 6, 3), yaw (n, 6)) with a "hairpin then S" leg, a shape the
+    generator (`fpv.track.sample_tracks`, gate yaw within 0.12 rad of the bisector of its legs) never
+    produces: a leg turning >= ``turn_min_deg`` into gate i, then an S-shaped leg out of gate i (exit
+    and entry angles of opposite sign, both >= ``s_min_deg``) whose exit turns against the previous
+    turn. Made from generator tracks by turning the yaw of gate i further into the preceding turn by
+    U(``delta``) rad (the drone must overshoot through the gate and swing back, as after a hairpin),
+    keeping only tracks that still satisfy every `fpv.track.track_valid` limit. Gate order is rotated
+    so that gate i is G4 (the S leg is the leg into G5, the leg where the student fails on sprint_hairpin).
+    Draws batches of 4096 generator tracks; raises after ``max_batches`` batches without ``n``
+    accepted. ``stats`` (a dict) receives ``drawn`` (valid generator tracks), ``accepted``, ``batches``."""
+    from fpv import track
+
+    rng = np.random.default_rng(seed)
+    out_p, out_y, k, drawn = [], [], 0, 0
+    while sum(len(p) for p in out_p) < n:
+        if k >= max_batches:
+            raise RuntimeError(f"hairpin_s_tracks: {sum(len(p) for p in out_p)} of {n} tracks accepted from "
+                               f"{drawn} valid generator tracks in {k} batches (seed {seed})")  # fmt: skip
+        pos, yaw, ok = (np.asarray(a) for a in track.sample_tracks(jax.random.key(seed * 1000 + k), 4096))
+        k += 1
+        pos, yaw = pos[ok].astype(np.float64), yaw[ok].astype(np.float64)
+        drawn += len(pos)
+        f = track.track_features(pos, yaw)
+        turn = f["exit"] + f["entry"]  # leg j: gate j -> j + 1
+        m = len(pos)
+        j = rng.integers(0, 6, m)
+        big = np.abs(turn[np.arange(m), j]) >= np.radians(turn_min_deg)
+        i = (j + 1) % 6
+        yaw = yaw.copy()
+        yaw[np.arange(m), i] += np.sign(turn[np.arange(m), j]) * rng.uniform(*delta, m)
+        f = track.track_features(pos, yaw)
+        ex, en = f["exit"][np.arange(m), i], f["entry"][np.arange(m), i]
+        prev = (f["exit"] + f["entry"])[np.arange(m), j]
+        s = np.radians(s_min_deg)
+        keep = (big & track.track_valid(f) & (np.sign(ex) != np.sign(en)) & (np.abs(ex) >= s) & (np.abs(en) >= s)
+                & (np.sign(prev) == -np.sign(ex)) & (np.abs(prev) >= np.radians(turn_min_deg)))  # fmt: skip
+        shift = (3 - i[keep]) % 6  # gate i becomes G4: the S leg is the leg into G5, as in sprint_hairpin
+        rows = (np.arange(6)[None] - shift[:, None]) % 6
+        out_p.append(np.take_along_axis(pos[keep], rows[..., None], 1))
+        out_y.append(np.take_along_axis(np.arctan2(np.sin(yaw[keep]), np.cos(yaw[keep])), rows, 1))
+    if stats is not None:
+        stats.update(drawn=drawn, accepted=int(sum(len(p) for p in out_p)), batches=k)
+    return np.concatenate(out_p)[:n].astype(np.float32), np.concatenate(out_y)[:n].astype(np.float32)
+
+
+def hairpin_seed(seed: int) -> int:
+    """FlightBatch seed of the hairpin slots of a `make_flights` call with ``seed`` (its tracks are
+    drawn with ``seed`` itself). Callers that make one call per round / collector call step their
+    seed by 2 so that this never equals another call's main seed."""
+    return seed + 1
+
+
+def make_flights(n: int, teacher, seed: int, layouts=None, hairpin_frac: float = 0.0, **kw):
+    """A FlightBatch on the teacher's training distribution (``layouts=None``) or a group with
+    ``n // len(layouts)`` slots per named layout (each with its own seed, ``seed + 7919 * i``).
+    ``hairpin_frac`` (training distribution only): that share of the slots flies fixed
+    `hairpin_s_tracks` (one per slot, drawn with ``seed``; FlightBatch seed `hairpin_seed`)."""
+    from fpv.closed_loop import FlightBatch
+
+    if not layouts:
+        k = int(round(n * hairpin_frac))
+        if k == 0:
+            return FlightBatch(n, teacher, seed=seed, **kw)
+        hp = FlightBatch(k, teacher, seed=hairpin_seed(seed), scenario=hairpin_s_tracks(k, seed), **kw)
+        return FlightBatchGroup([FlightBatch(n - k, teacher, seed=seed, **kw), hp] if k < n else [hp])
+    assert not hairpin_frac, "hairpin_frac applies to the training distribution only"
+    k = n // len(layouts)
+    assert k * len(layouts) == n, f"{n} slots do not split into {len(layouts)} layouts"
+    return FlightBatchGroup([FlightBatch(k, teacher, seed=seed + 7919 * i, scenario=name, **kw)
+                             for i, name in enumerate(layouts)])  # fmt: skip
+
+
 def make_renderer(kind: str, n: int, width: int, height: int, seed: int = 0, **kw):
+    """A renderer with a ``highlight_target`` attribute; when ``kw`` asks for the target highlight the
+    renderer must have it on (`fly` / `render_rows` then always pass ``target=``)."""
     if kind == "synth":
         from fpv.render_synth import SynthRenderer
 
-        return SynthRenderer(n, width, height, seed=seed, **kw)
-    if kind == "airsim":
+        r = SynthRenderer(n, width, height, seed=seed, **kw)
+    elif kind == "airsim":
         from fpv.render_airsim import AirsimRenderer
 
-        return AirsimRenderer(width=width, height=height, **kw)  # n = len(gpus) * instances_per_gpu
-    raise ValueError(kind)
+        r = AirsimRenderer(width=width, height=height, **kw)  # n = len(gpus) * instances_per_gpu
+    else:
+        raise ValueError(kind)
+    if not isinstance(getattr(r, "highlight_target", None), bool):
+        raise TypeError(f"{type(r).__name__} has no boolean highlight_target attribute")
+    if bool(kw.get("highlight_target", False)) != r.highlight_target:
+        raise RuntimeError(f"renderer args ask for highlight_target={kw.get('highlight_target', False)}, "
+                           f"{type(r).__name__} has highlight_target={r.highlight_target}")  # fmt: skip
+    return r
+
+
+def highlight_on(renderer) -> bool:
+    """Whether this renderer marks the target gate (recorded in config.json / eval.json)."""
+    return bool(renderer.highlight_target)
 
 
 # region shards
 class ShardWriter:
-    def __init__(self, data_dir, round_id: int):
+    def __init__(self, data_dir, round_id: int, seed: int | None = None, training: bool = True, call: int | None = None,
+                 keep_cache: bool = False, **meta):
+        """``seed``: of the `FlightBatch` that flies this call (recorded in seeds.jsonl, with ``meta``).
+        ``training=False`` marks the directory as evaluation flights (never loaded for training)."""
         self.dir = Path(data_dir)
         self.dir.mkdir(parents=True, exist_ok=True)
+        if not training:
+            (self.dir / NOT_TRAINING).write_text("evaluation flights: failure analysis only, never training data\n")
+        elif (self.dir / NOT_TRAINING).exists():
+            raise ValueError(f"{self.dir} holds evaluation flights; training data must go elsewhere")
         calls = {int(p.name.split("_")[1][1:]) for p in self.dir.glob(f"r{round_id:03d}_c*_*.npz")}
-        self.prefix = f"r{round_id:03d}_c{max(calls, default=-1) + 1:02d}"
-        self.seq, self.frames = 0, 0
+        if call is None:
+            call = max((c for c in calls if c < 50), default=-1) + 1  # ids >= 50: extra collectors (``call``)
+        assert call not in calls, f"call {call} of round {round_id} exists in {self.dir}"
+        self.prefix = f"r{round_id:03d}_c{call:02d}"
+        self.seq, self.frames, self.keep_cache = 0, 0, keep_cache
+        append_jsonl(self.dir / "seeds.jsonl", dict(call=self.prefix, seed=seed, training=training, **meta))
 
     def write(self, rows: list[dict]):
         arrs = {k: np.stack([r[k] for r in rows]) for k in REC_FIELDS}
         tmp = self.dir / f"{self.prefix}_{self.seq:04d}.tmp.npz"
         np.savez(tmp, **arrs)
-        drop_page_cache(tmp, sync=True)
+        if not self.keep_cache:  # keep_cache: another process is about to read it (see extra_collect.py)
+            drop_page_cache(tmp, sync=True)
         tmp.rename(self.dir / f"{self.prefix}_{self.seq:04d}.npz")
         self.seq += 1
         self.frames += int(arrs["valid"].sum())
+
+
+NOT_TRAINING = "NOT_TRAINING_DATA"
+
+
+def data_seeds(dirs) -> set:
+    """FlightBatch seeds recorded for training data in these data directories."""
+    out = set()
+    for d in dirs:
+        p = Path(d) / "seeds.jsonl"
+        if p.exists():
+            for r in map(json.loads, p.read_text().splitlines()):
+                if r.get("training", True):
+                    out |= {r["seed"], *r.get("layout_seeds", []), *([r["hairpin_seed"]] if r.get("hairpin_seed") else [])}
+    return out
+
+
+def check_held_out(seed: int, dirs):
+    """Raise if ``seed`` produced training data in any of ``dirs`` (or a directory has no record)."""
+    for d in dirs:
+        if not (Path(d) / "seeds.jsonl").exists():
+            raise ValueError(f"{d}: no seeds.jsonl, cannot show that seed {seed} is held out")
+    if seed in data_seeds(dirs):
+        raise ValueError(f"seed {seed} produced training data in {dirs}; evaluate with another seed")
+
+
+def relabeller(teacher_ckpt, chunk: int = 65536):
+    """teacher_obs [N, 43] -> the deterministic action of another teacher [N, 4] (numpy)."""
+    from fpv import ppo
+
+    net, params, norm, *_ = ppo.load_checkpoint(teacher_ckpt)
+    f = jax.jit(lambda o: ppo.policy_action(net, params, norm, o))
+
+    def label(obs):
+        out = np.empty((len(obs), 4), np.float32)
+        for i in range(0, len(obs), chunk):
+            j = min(i + chunk, len(obs))
+            o = np.zeros((chunk, obs.shape[1]), np.float32)
+            o[: j - i] = obs[i:j]
+            out[i:j] = np.asarray(f(o))[: j - i]
+        return out
+
+    return label
 
 
 def drop_page_cache(path, sync: bool = False):
@@ -82,7 +258,7 @@ class Block:
     teacher cannot save those states either; they still serve as frame history).
     """
 
-    def __init__(self, paths, round_id: int, drop_before_crash: int = 8, max_steps: int = 1500):
+    def __init__(self, paths, round_id: int, drop_before_crash: int = 8, max_steps: int = 1500, relabel=None):
         parts = [dict(np.load(p)) for p in sorted(paths)]
         for p in paths:
             drop_page_cache(p)
@@ -92,7 +268,10 @@ class Block:
         flat = lambda a: np.ascontiguousarray(np.swapaxes(a, 0, 1)).reshape(T * n, *a.shape[2:])  # noqa: E731
         self.frames = flat(cat("frames"))
         self.label, self.prev_action = flat(cat("label")), flat(cat("prev_action"))
-        self.aux = flat(cat("teacher_obs"))[:, st.AUX_IDX]
+        obs = flat(cat("teacher_obs"))
+        self.aux = obs[:, st.AUX_IDX]
+        if relabel is not None:
+            self.label = relabel(obs)
         self.by_teacher = flat(cat("by_teacher"))
         first = (t == 0) | (np.arange(T)[:, None] == 0)  # an episode start, or the start of the recording
         idx = np.where(first, np.arange(T)[:, None], 0)
@@ -113,13 +292,17 @@ class Block:
 
 
 class Dataset:
-    def __init__(self):
+    def __init__(self, relabel: str | None = None):
+        """``relabel``: teacher checkpoint whose actions replace the stored labels (teacher swap)."""
         self.blocks: list[Block] = []
         self.loaded: set[str] = set()
+        self.relabel = relabeller(relabel) if relabel else None
 
     def add_dir(self, data_dir, rounds=None, extra: bool = False):
         """Load every not yet loaded `fly` call found in data_dir (optionally only some rounds).
         ``extra`` marks data of another run / renderer (see `train`'s ``extra_frac``)."""
+        if (Path(data_dir) / NOT_TRAINING).exists():
+            raise ValueError(f"{data_dir} holds evaluation flights, not training data")
         groups: dict[tuple[str, str], list[Path]] = {}
         for p in sorted(Path(data_dir).glob("r*_c*_*.npz")):
             if ".tmp" in p.name:
@@ -130,7 +313,7 @@ class Dataset:
             rid = int(key[1:4])
             if f"{d}/{key}" in self.loaded or (rounds is not None and rid not in rounds):
                 continue
-            self.blocks.append(Block(paths, rid))
+            self.blocks.append(Block(paths, rid, relabel=self.relabel))
             self.blocks[-1].extra = extra
             self.loaded.add(f"{d}/{key}")
         return self
@@ -222,7 +405,10 @@ def fly(fb, renderer, runner=None, *, steps: int, beta: float = 0.0, reset_done:
     per step, a burst of ``burst_len`` steps with a constant random offset (uniform in
     +/- ``burst_mag``) on all four channels.
     ``reset_done``: finished slots start a new episode (collection); otherwise they stay finished
-    and the loop ends when all are (evaluation; the renderer gets ``active=~done``).
+    and the loop ends when all are (evaluation; the renderer gets ``active=~done``). Renderers with
+    ``highlight_target`` also get the target gate index of every state.
+    ``trace``: True records per-step poses, actions, labels, targets, layouts and frames;
+    "noframes" the same without frames.
     ``defer_render`` (teacher-flown collection only): fly first without rendering, then render all
     recorded poses with the renderer's open-loop ``render_trajectories``.
 
@@ -266,7 +452,7 @@ def fly(fb, renderer, runner=None, *, steps: int, beta: float = 0.0, reset_done:
         frames = None
         if render:
             t0 = time.perf_counter()
-            frames = np.array(renderer.render(s["pos"], s["quat"], active=alive))  # copy: may be a shared buffer
+            frames = np.array(renderer.render(s["pos"], s["quat"], active=alive, **_tgt(renderer, s["target"])))  # copy
             info["render_s"] += time.perf_counter() - t0
             info["frames_rendered"] += int(alive.sum())
         t0 = time.perf_counter()
@@ -299,7 +485,9 @@ def fly(fb, renderer, runner=None, *, steps: int, beta: float = 0.0, reset_done:
                 rows = []
         if trace:
             traces.append(dict(pos=s["pos"].copy(), quat=s["quat"].copy(), action=action, label=label,
-                               target=s["target"].copy(), alive=alive.copy(), frames=frames))  # fmt: skip
+                               target=s["target"].copy(), alive=alive.copy(),
+                               frames=None if trace == "noframes" else frames,
+                               gates_pos=s["gates_pos"], gates_yaw=s["gates_yaw"]))  # fmt: skip
         acc["speed"] += np.where(alive, np.linalg.norm(s["vel"], axis=-1), 0)
         acc["teach"] += alive & use_teacher
         acc["steps"] += alive
@@ -352,6 +540,14 @@ def fly(fb, renderer, runner=None, *, steps: int, beta: float = 0.0, reset_done:
     return episodes, info
 
 
+def _tgt(renderer, target) -> dict:
+    """The ``target`` keyword for renderers that mark the target gate (``highlight_target``)."""
+    if not renderer.highlight_target:
+        return {}
+    assert target is not None, "highlight_target renderer without target gates"
+    return {"target": target}
+
+
 def render_rows(renderer, rows: list[dict], info: dict, log=None, chunk: int = 32):
     """Fill ``frames`` of recorded steps with `render_trajectories`; gates are re-set at episode starts."""
     n, t = len(rows[0]["t"]), 0
@@ -367,7 +563,8 @@ def render_rows(renderer, rows: list[dict], info: dict, log=None, chunk: int = 3
                 break
         pos = np.stack([r["pos"] for r in rows[t:end]], 1)
         quat = np.stack([r["quat"] for r in rows[t:end]], 1)
-        frames = renderer.render_trajectories(np.arange(n), pos, quat)
+        tgt = np.stack([r["target"] for r in rows[t:end]], 1)
+        frames = renderer.render_trajectories(np.arange(n), pos, quat, **_tgt(renderer, tgt))
         for j, r in enumerate(rows[t:end]):
             r["frames"] = np.array(frames[:, j])
         info["frames_rendered"] += n * (end - t)
@@ -391,6 +588,7 @@ def summarize(episodes: list[dict], policy_hz: float = 50.0) -> dict:
             laps.append((p[6:] - p[:-6]) / policy_hz)
     laps = np.concatenate(laps) if laps else np.zeros(0)
     crash_tgt = np.bincount([e["crash_target"] for e in episodes if e["outcome"] > 0], minlength=6)
+    crash_t = length[out > 0] / policy_hz
     err = np.array([e["act_err"] for e in episodes if e.get("has_err")])
     wts = np.array([e["length"] for e in episodes if e.get("has_err")], float)
     res = dict(
@@ -401,6 +599,10 @@ def summarize(episodes: list[dict], policy_hz: float = 50.0) -> dict:
         crash_rate=float((out > 0).mean()),
         crash_rate_by_cause={OUTCOMES[k]: float((out == k).mean()) for k in (1, 2, 3)},
         crashes_by_target_gate=crash_tgt.tolist(),
+        # share of all episodes crashing in each time window [s] (sums to crash_rate)
+        crash_time_hist=dict(edges_s=list(CRASH_T_EDGES),
+                             frac=(np.histogram(crash_t, CRASH_T_EDGES)[0] / len(episodes)).tolist()),
+        crash_time_median_s=float(np.median(crash_t)) if len(crash_t) else None,
         episode_length_s=float(length.mean() / policy_hz),
         lap_time_s=float(laps.mean()) if len(laps) else None, n_laps=int(len(laps)),
         speed_m_s=float(np.average([e["speed"] for e in episodes], weights=np.maximum(length, 1))),
@@ -422,8 +624,21 @@ def evaluate(fb, renderer, runner, steps: int | None = None, rng=None, trace: bo
 
 
 def append_jsonl(path, row: dict):
-    with open(path, "a") as f:
-        f.write(json.dumps(row) + "\n")
+    line = json.dumps(row) + "\n"
+
+    def write():
+        with open(path, "a") as f:
+            f.write(line)
+
+    st.retry_quota(write)
+
+
+def log(m: str):
+    """Time-stamped progress line; a log file on a full network home must not kill the run."""
+    try:
+        print(f"[{time.strftime('%H:%M:%S')}] {m}", flush=True)
+    except OSError:
+        pass
 
 
 def add_student_args(ap):

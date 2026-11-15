@@ -1,9 +1,13 @@
-"""Trajectory figure and chase-view animation from an exported ``rollouts.npz``.
+"""Trajectory figure and chase-view animation from an exported ``rollouts.npz``; scenario figure from
+flight records.
 
     .venv-sim/bin/python scripts/plot_teacher.py runs/teacher/<run>/rollouts.npz
+    .venv-sim/bin/python scripts/plot_teacher.py --records runs/teacher/<run>/records
 
-Writes next to the rollouts: ``trajectory.png`` (top-down + side views of nominal-circuit flights,
-coloured by speed, gates drawn) and ``flight.mp4`` (one multi-lap nominal flight, chase 3D view).
+Writes next to the rollouts: ``trajectory.png`` (top-down + side views of nominal flights of the
+training distribution, coloured by speed, gates drawn) and ``flight.mp4`` (one multi-lap nominal
+flight, chase 3D view). With ``--records``: ``scenarios.png`` next to the records directory, a
+top-down and a side view (x-z) of the flight record of every named scenario.
 """
 
 from __future__ import annotations
@@ -48,8 +52,8 @@ def gate_loops(gates_pos, gates_yaw):
 
 
 def pick_episode(d) -> int:
-    """Longest nominal episode (most gates passed)."""
-    nominal = np.flatnonzero(d["nominal"])
+    """Longest nominal episode (most gates passed) of the training distribution."""
+    nominal = np.flatnonzero(d["nominal"] & (d["scenario"] < 0 if "scenario" in d else True))
     return int(nominal[np.argmax(d["passed"][nominal].sum(1) + 1e-3 * d["length"][nominal])])
 
 
@@ -60,7 +64,10 @@ def figure(d, ep: int, path: Path, n_overlay: int = 20):
     fig, axes = plt.subplots(1, 3, figsize=(19, 6.5), gridspec_kw={"width_ratios": [1.25, 1.25, 1.1]})
     views = (((0, 1), "top-down", "x [m]", "y [m]"), ((0, 2), "side (x-z)", "x [m]", "z [m]"),
              ((1, 2), "side (y-z)", "y [m]", "z [m]"))  # fmt: skip
-    others = [e for e in np.flatnonzero(d["nominal"]) if e != ep][:n_overlay]
+    same = d["nominal"] & (d["scenario"] == d["scenario"][ep] if "scenario" in d else True)
+    # Other episodes only on the same layout (procedural tracks differ per episode)
+    same &= np.all(np.abs(d["gates_pos"] - d["gates_pos"][ep]).reshape(len(same), -1) < 1e-4, axis=1)
+    others = [e for e in np.flatnonzero(same) if e != ep][:n_overlay]
     norm = plt.Normalize(0, max(speed.max(), 1e-3))
     for ax, ((i, j), title, xl, yl) in zip(axes, views):
         for e in others:
@@ -86,10 +93,56 @@ def figure(d, ep: int, path: Path, n_overlay: int = 20):
     fig.colorbar(lc, ax=axes, label="speed [m/s]", shrink=0.8, pad=0.01)
     gates = int(d["passed"][ep, :n].sum())
     fig.suptitle(
-        f"Teacher on the nominal circuit: episode {ep}, {n / 50:.1f} s, {gates} gates ({gates / len(gp):.1f} laps), "
+        f"Teacher, nominal layout: episode {ep}, {n / 50:.1f} s, {gates} gates ({gates / len(gp):.1f} laps), "
         f"speed mean {speed.mean():.1f} / max {speed.max():.1f} m/s; grey: {len(others)} other nominal episodes"
     )
     fig.savefig(path, dpi=110, bbox_inches="tight")
+    plt.close(fig)
+
+
+def scenario_figure(records: list[dict], path: Path):
+    """Top-down + side (x-z) view of one flight record per scenario, coloured by speed."""
+    n = len(records)
+    cols = 2  # scenarios per row, two axes each
+    rows = (n + cols - 1) // cols
+    fig, axes = plt.subplots(rows, 2 * cols, figsize=(9.5 * cols, 4.3 * rows),
+                             gridspec_kw={"width_ratios": [1.0, 1.15] * cols}, squeeze=False)  # fmt: skip
+    vmax = max(float(np.linalg.norm(r["vel"], axis=-1).max()) for r in records)
+    norm = plt.Normalize(0, vmax)
+    lc = None
+    for k, r in enumerate(records):
+        pos, speed = r["pos"], np.linalg.norm(r["vel"], axis=-1)
+        gp, gy = r["gates_pos"], r["gates_yaw"]
+        gates, secs = int(r["passed"].sum()), len(pos) / float(r["hz"])
+        for a, (i, j), xl, yl in ((0, (0, 1), "x [m]", "y [m]"), (1, (0, 2), "x [m]", "z [m]")):
+            ax = axes[k // cols, 2 * (k % cols) + a]
+            seg = np.stack([pos[:-1, (i, j)], pos[1:, (i, j)]], axis=1)
+            lc = LineCollection(seg, cmap="turbo", norm=norm, lw=1.2, zorder=2)
+            lc.set_array(speed[:-1])
+            ax.add_collection(lc)
+            for loop in gate_loops(gp, gy):
+                ax.plot(loop[:, i], loop[:, j], "k-", lw=1.3, zorder=3)
+            if a == 0:
+                for g, (p, y) in enumerate(zip(gp, gy)):
+                    ax.annotate("", p[:2] + 0.6 * np.array([np.cos(y), np.sin(y)]), p[:2],
+                                arrowprops=dict(arrowstyle="->", color="k"))  # fmt: skip
+                    ax.text(p[0] + 0.2, p[1] + 0.2, f"G{g + 1}", fontsize=9)
+                ax.set_title(f"{r['name']}: {gates} gates ({gates / len(gp):.1f} laps) in {secs:.0f} s, "
+                             f"mean {speed.mean():.1f} m/s", fontsize=11)  # fmt: skip
+            else:
+                ax.axhline(0, color="0.6", lw=0.8)
+                ax.set_title("side view (x-z)", fontsize=10)
+            ax.plot(pos[0, i], pos[0, j], "go", ms=6, zorder=4)
+            ax.set(xlabel=xl, ylabel=yl)
+            ax.set_aspect("equal", adjustable="datalim")
+            ax.grid(alpha=0.3)
+            ax.autoscale_view()
+    for k in range(n, rows * cols):
+        axes[k // cols, 2 * (k % cols)].axis("off")
+        axes[k // cols, 2 * (k % cols) + 1].axis("off")
+    fig.colorbar(lc, ax=axes, label="speed [m/s]", shrink=0.6, pad=0.01)
+    fig.suptitle("Teacher, nominal flights on the named scenarios (green dot: spawn; arrows: direction of travel)")
+    fig.savefig(path, dpi=100, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -145,11 +198,21 @@ def movie(d, ep: int, path: Path, seconds: float, fps: int = 25):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("rollouts")
+    ap.add_argument("rollouts", nargs="?")
+    ap.add_argument("--records", default=None, help="directory of flight records -> ../scenarios.png")
     ap.add_argument("--episode", type=int, default=None, help="episode index (default: longest nominal)")
     ap.add_argument("--seconds", type=float, default=20.0, help="length of the animation")
     ap.add_argument("--no-movie", action="store_true")
     args = ap.parse_args()
+    if args.records:
+        rec_dir = Path(args.records)
+        order = {name: i for i, name in enumerate(track.SCENARIOS)}
+        files = sorted(rec_dir.glob("*.npz"), key=lambda f: order.get(f.stem, len(order)))
+        records = [{k: v[()] if v.ndim == 0 else v for k, v in np.load(f).items()} for f in files]
+        scenario_figure(records, rec_dir.parent / "scenarios.png")
+        print(f"wrote {rec_dir.parent / 'scenarios.png'} ({len(records)} scenarios)")
+        if not args.rollouts:
+            return
     path = Path(args.rollouts)
     d = np.load(path)
     d = {k: d[k] for k in d.files}

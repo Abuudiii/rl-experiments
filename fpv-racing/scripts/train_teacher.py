@@ -4,7 +4,8 @@
         --set ppo.total_steps=2e9 env.w_cam=0.05
 
 Any field of `fpv.env.EnvConfig` / `fpv.ppo.PPOConfig` can be overridden with
-``--set env.<field>=<value> ppo.<field>=<value>``. Outputs in ``runs/teacher/<name>/``:
+``--set env.<field>=<value> ppo.<field>=<value>`` (e.g. ``env.track=random`` for procedural tracks,
+``env.track_complexity=0.5`` for an easier subset of them). Outputs in ``runs/teacher/<name>/``:
 ``config.json``, ``metrics.jsonl`` (one line per logged iteration), ``ckpt_<iter>.pkl`` and
 ``ckpt_latest.pkl`` (params + observation normaliser + full config).
 """

@@ -12,7 +12,15 @@ import sys
 from pathlib import Path
 
 COLS = ("round", "beta", "new frames", "data frames", "collect s", "train s", "train MAE", ">=1 lap", ">=3 laps",
-        "no crash", "gates/ep", "gate / ground / oob", "lap s", "MAE vs teacher", "eval frames", "eval s")  # fmt: skip
+        "no crash", "gates/ep", "gate / ground / oob", "lap s", "MAE vs teacher", "eval frames", "eval s",
+        "scenarios >=3 laps (min, name)")  # fmt: skip
+
+
+def scen_cell(sc: dict | None) -> str:
+    if not sc:
+        return "-"
+    name = min(sc, key=lambda k: sc[k]["frac_3_laps"])
+    return f"{100 * sc[name]['frac_3_laps']:.1f}% ({name}; {sc[name]['episodes']} eps each)"
 
 
 def table(run: Path) -> str:
@@ -28,6 +36,7 @@ def table(run: Path) -> str:
             f"{100 * m['frac_full_episode_no_crash']:.1f}%", f"{m['gates_per_episode']:.1f}",
             f"{100 * c['gate_crash']:.0f} / {100 * c['ground']:.0f} / {100 * c['out_of_bounds']:.0f} %", lap,
             f"{m.get('action_mae_vs_teacher', float('nan')):.3f}", r["eval_frames"], f"{r['eval_wall_s']:.0f}",
+            scen_cell(r.get("eval_scenarios")),
         )) + " |")  # fmt: skip
     return "\n".join(out)
 

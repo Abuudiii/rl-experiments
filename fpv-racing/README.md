@@ -5,9 +5,11 @@ commands a human pilot sends (thrust and roll / pitch / yaw rate). Everything is
 
 **Models and video:** https://huggingface.co/Abuudiii/fpv-gate-racing
 
-![The student flying from its camera](figures/fpv_flight.gif)
+![The student flying from its camera, with a chase view](figures/third_person.gif)
 
-The student's own view in Unreal. Bars: the sticks it commands; white tick: what the teacher would have done.
+Left: the student's own view in Unreal, the only thing it flies from. Bars: the sticks it commands; white tick: what
+the teacher would have done. Right: a chase camera on the same flight (the drone model is drawn at twice its true
+size; the student's view never contains it). Full videos with an overview camera are on the model page.
 
 ## Result
 
@@ -24,6 +26,67 @@ All 8 student crashes are gate-frame hits; 7 happen in the first 4 seconds, befo
 went into the training data, so the table leaves them out.
 
 ![Top-down paths](figures/trajectory_student_vs_teacher.png)
+
+## Other track shapes
+
+The student above knows one circuit. A second teacher, trained with PPO on randomly generated six-gate tracks, flies
+six named tracks. Five of them it never trained on; the sixth, the original circuit, is where the teacher it
+started from was trained. This is the state-based teacher; the camera students for these tracks follow below.
+
+| Track | ≥ 3 laps (2,048 randomised episodes) | Lap time | Crashes per flight-minute with stick noise (std 0.2) |
+|---|---|---|---|
+| Circuit (the original) | 100% | 4.73 s | 0.009 |
+| Clockwise | 100% | 4.70 s | 0.008 |
+| Figure-8 | 100% | 6.71 s | 0.059 |
+| Slalom | 100% | 6.21 s | 0.025 |
+| Climb and dive | 100% | 5.07 s | 0.024 |
+| Sprint into a hairpin | 100% | 5.41 s | 0.036 |
+| Random tracks (what it trained on) | 100% | 5.92 s | 0.039 |
+
+![Teacher flights on the six tracks](figures/scenarios_teacher.png)
+
+![Teacher on the figure-8, chase view](figures/figure8_teacher_chase.gif)
+
+The track generator (`fpv.track.sample_tracks`) draws a new closed six-gate track for every episode: uneven loops in
+both directions (straights into tight turns, weaves), two-lobe figure-eights, with height changes up to 1.8 m,
+subject to spacing, turn-angle and clearance limits. The six named tracks (`fpv.track.SCENARIOS`) are not built into
+it. How held-out they are differs: the figure-8 lies inside the generator's two-lobe family, so it is the weakest
+test; the hairpin and the climb-and-dive are the furthest from the training mix. The slalom weaves through three of
+its six gates, since a closed six-gate loop that keeps the next gate in view cannot weave all the way round.
+
+What it took: starting from the single-circuit teacher (training from scratch on random tracks stalled at hovering), a
+stronger reward for keeping the next gate in the camera's view, and then stronger stick noise in training, which
+brought the crash rate under noise below 0.06 per flight-minute on every track.
+
+## Camera student on the other tracks
+
+A second camera student sees the last five frames, and **the next gate to fly through is drawn green** (the others
+stay magenta): on a track it has not memorised, the image alone does not say which gate comes next. It was first
+trained on randomly generated tracks only (831,000 Unreal frames), then **trained directly on two tracks, the
+figure-8 and the climb-and-dive**, with DAgger in Unreal (about 447,000 frames flown on those two, four rounds,
+mixed with the random-track frames at 30% of every batch).
+
+| Track | Trained on it? | ≥ 3 laps, randomised episodes [95% interval] | Crashes | Lap time | Nominal track: ≥ 3 laps (24 episodes) |
+|---|---|---|---|---|---|
+| Figure-8 | yes | 100% of 96 [96, 100] | 0% | 6.74 s | 100% |
+| Climb and dive | yes | 100% of 96 [96, 100] | 0% | 5.10 s | 100% |
+| Circuit | no | 91.7% of 48 [80, 97] | 10.4% | 4.97 s | 100% |
+| Slalom | no | 79.2% of 48 [66, 88] | 27.1% | 6.62 s | 87.5% |
+| Clockwise | no | 72.9% of 48 [59, 83] | 33.3% | 5.10 s | 100% |
+| Sprint into a hairpin | no | 35.4% of 48 [23, 50] | 72.9% | 6.44 s | 8.3% |
+
+The two "yes" rows are the tuned checkpoint; the four "no" rows are the random-track checkpoint before that tuning,
+shown as it flies, with no training on any of the four. The tuned checkpoint was not evaluated on them. One
+evaluation pass per track in Unreal, 30 s episodes, randomised drone physics, gate positions and spawns; the teacher
+completes three laps in every one of the same episodes. The tuned checkpoint was fixed on a separate selection seed
+before the final pass. On the hairpin track 31 of 35 crashes are on the leg right after the hairpin.
+
+![Tuned student on the figure-8](figures/figure8_student.gif)
+
+![Tuned student on the climb-and-dive](figures/climb_dive_student.gif)
+
+Checkpoints, evaluations and one video per track (first flight of a fixed seed, including the hairpin flight that
+crashes) are on the model page under `tracks/student_two/` and `tracks/student_asis/`.
 
 ## How it works
 
@@ -49,7 +112,8 @@ flowchart LR
 | Physics | `fpv/env.py` | Gate-racing environment on [Crazyflow](https://github.com/learnsyslab/crazyflow) (batched JAX quadrotor sim, Crazyflie-class `cf21B_500`), 500 Hz physics, 50 Hz policy. It is the only dynamics in every stage. |
 | Teacher | `fpv/ppo.py` | PPO in JAX. Input: velocity, attitude, body rates, corners of the next two gates, previous action. MLP 3 × 256. |
 | Closed loop | `fpv/closed_loop.py` | Steps Crazyflow for an outside pilot and returns the teacher's action for the current state (the label). |
-| Renderers | `fpv/render_airsim.py`, `fpv/render_synth.py` | Draw the FPV frame for a given pose. [Project AirSim](https://github.com/iamaisim/ProjectAirSim) (Unreal Engine 5, 24 instances on 6 GPUs) or a fast JAX ray caster. Neither does any physics. |
+| Tracks | `fpv/track.py` | Gate geometry, the six named tracks and the random-track generator. |
+| Renderers | `fpv/render_airsim.py`, `fpv/render_synth.py` | Draw the FPV frame for a given pose. [Project AirSim](https://github.com/iamaisim/ProjectAirSim) (Unreal Engine 5, 24 instances on 6 GPUs) or a fast JAX ray caster. Neither does any physics. The Unreal renderer can also draw a drone model with chase and overview cameras for videos. |
 | Student | `fpv/student.py` | CNN, 2.43 M parameters. Input: last three 320×180 frames + its previous action. |
 | DAgger | `fpv/dagger.py` | The student flies, drifts into states the teacher never visits, the teacher labels them, the student is retrained. |
 
@@ -65,7 +129,8 @@ Design choices that mattered:
   renders about 2,500 at the same resolution on one. The student learned to fly on the ray caster first. With the same first 171,000 Unreal frames, the pre-trained network
   completed three laps in 24 of 24 test episodes and one trained from scratch in none.
 - **Lock-step rendering.** `scripts/test_render_airsim.py` checks that every frame belongs to the pose that was sent
-  (0 mismatches in 32,000 frames under load) and that gates appear where the camera model predicts.
+  (0 mismatches in 32,000 frames under load) and that gates appear where the camera model predicts. The third-person
+  views are checked the same way (0 of 3,840 frames matched a step other than their own).
 
 ## Setup
 
@@ -107,10 +172,32 @@ $py scripts/eval_student.py $R/pre_synth/ckpt.pkl --renderer airsim --renderer-a
 $py scripts/run_dagger.py --out $R --renderer airsim --renderer-args "$UE" --sim-device cpu --init $R/pre_synth/ckpt.pkl \
     --first-round 13 --rounds 16 --steps 0 --beta 0 --train-steps 3000 --eval-episodes 48 --eval-steps 1000 --eval-as-data --resume
 
-# 5. final evaluation and video
+# 5. final evaluation and video (pilot's view + chase + overview)
 $py scripts/eval_student.py $R/ckpt_latest.pkl --renderer airsim --renderer-args "$UE" --episodes 216 --nominal-episodes 24 \
     --steps 1000 --sim-device cpu --out $R/best/eval.json
-$py scripts/student_flight_video.py $R/ckpt_latest.pkl --renderer airsim --renderer-args "$UE" --sim-device cpu --out $R/best
+$py scripts/student_flight_video.py $R/ckpt_latest.pkl --teacher $T --renderer airsim --renderer-args "$UE" --sim-device cpu \
+    --seed 2026 --scenario circuit --out $R/best/third_person
+
+# 6. teacher for other track shapes: random tracks, starting from the circuit teacher
+REC="env.w_crash=10 env.w_speed=0.05 env.speed_limit=4.0 env.p_wide=0.5 env.track=random env.w_cam=0.2"
+$py scripts/train_teacher.py --name rt_D_cam02 --seed 105 --init $T \
+    --set ppo.total_steps=3e9 $REC env.rand_action_noise=0.2 env.p_action_noise=0.5
+$py scripts/train_teacher.py --name rt_G_D_noise3 --seed 108 --init runs/teacher/rt_D_cam02/ckpt_latest.pkl \
+    --set ppo.total_steps=3e9 $REC env.rand_action_noise=0.3 env.p_action_noise=0.7
+$py scripts/eval_teacher.py runs/teacher/rt_G_D_noise3/ckpt_latest.pkl --seed 7000 --records   # per-track metrics + flight records
+$py scripts/flight_video.py runs/teacher/rt_G_D_noise3/records/*.npz --out runs/teacher/rt_G_D_noise3/videos --subdirs \
+    --caption "{stem}: state-based teacher" --gpus 4 5 --ipg 4
+
+# 7. camera student for other tracks (5 frames, next gate green): random tracks first, then the two tuned tracks
+HL='{"gpus":[0],"instances_per_gpu":4,"look":"stock","highlight_target":true,"highlight_rgb":[0,1,0]}'
+A=runs/student/ue_tracks/asis/ckpt.pkl          # round 21 of the random-track Unreal run
+$py scripts/run_dagger.py --out runs/student/ue_tracks/two --train-scenarios figure8,climb_dive --init $A \
+    --teacher runs/teacher/rt_G_D_noise3/ckpt_latest.pkl --renderer airsim --renderer-args "$HL" \
+    --first-round 30 --rounds 60 --steps 1500 --beta 0 --train-steps 5000 --eval-episodes 8 --eval-steps 1500 \
+    --eval-as-data --seed 500000 --wide-spawn-p 0.3 --extra-data <random-track data dirs> --extra-frac 0.3
+$py scripts/extra_collect.py ...                # more collectors on the other GPUs, same checkpoint (see its docstring)
+$py scripts/eval_student.py runs/student/ue_tracks/two/ckpt_r33.pkl --teacher runs/teacher/rt_G_D_noise3/ckpt_latest.pkl \
+    --renderer airsim --renderer-args "$HL" --scenarios figure8 --episodes 96 --nominal-episodes 24 --seed 950001
 ```
 
 Step 3 also evaluated a from-scratch network the same way, and both evaluations were stored as round 12 of the data.
@@ -120,8 +207,10 @@ laptop (`LOGIN`, `JOB`, `NODE_DIR`).
 
 ## Limits
 
-- One circuit in one Unreal scene (Blocks). Another track or look is untested.
+- The single-circuit student knows one circuit. The five-frame student was tuned on two tracks only, needs the next
+  gate drawn green, and its untuned version is weak on the hairpin track.
+- One Unreal scene (Blocks). Another look is untested.
 - Cruise speed, about 4 m/s; this is not aggressive racing.
 - Simulation only: no real flight-controller firmware, no real camera.
-- Unreal instances sometimes fail to start (twice in a row before the final evaluation ran); the scripts were retried
-  by hand.
+- Unreal instances sometimes failed to start when 24 were launched together. The renderer now retries failed
+  instances one by one (no retry was needed in 120 later launches, and a forced failure is retried as designed).

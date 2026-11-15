@@ -18,6 +18,11 @@ Teacher observation, `teacher_obs`, 43 float32 (before the running normaliser of
     [39:43]  previous action (clipped to [-1, 1])
 
 Body frame: x forward, y left, z up (thrust axis). Quaternions are xyzw (scipy / Crazyflow).
+
+Tracks: ``EnvConfig.track`` selects the nominal layout of every episode: "circuit" (default, the
+original single circuit), another name in `fpv.track.SCENARIOS`, or "random" (a new procedural
+track per reset, `fpv.track.sample_tracks`). Per-gate randomisation, spawns (standard and wide) and
+the out-of-bounds box follow the episode's track; nothing in the observation is tied to a layout.
 """
 
 from __future__ import annotations
@@ -92,8 +97,15 @@ class EnvConfig:
     # Termination
     gate_margin: float = 0.05  # drone radius: opening shrinks and frame grows by this [m]
     ground_z: float = 0.10
-    box_margin: float = 3.0  # horizontal margin around the nominal circuit
+    box_margin: float = 3.0  # horizontal margin around the episode's nominal track (before gate randomisation)
     z_max: float = 3.5
+    # Track layout of an episode (rand_gate_pos / rand_gate_yaw are applied on top in every case):
+    # "circuit" (fpv.track.CIRCUIT), another name in fpv.track.SCENARIOS (fixed layout), or "random":
+    # a new procedural track (fpv.track.sample_tracks) at every reset.
+    track: str = "circuit"
+    track_complexity: float = 1.0  # "random": 0 = regular hexagons ... 1 = full distribution
+    track_candidates: int = 32  # "random": candidates per track (first valid one is used)
+    track_pool: int = 512  # "random": tracks generated per step for the environments that reset
     # Reward
     w_progress: float = 1.0  # per metre of distance reduction to the next gate centre
     w_gate: float = 1.0  # per gate passed
@@ -128,8 +140,10 @@ class EnvConfig:
 @struct.dataclass
 class EnvState:
     data: object  # Crazyflow SimData
-    gates_pos: jax.Array  # (N, G, 3) per-environment layout
+    gates_pos: jax.Array  # (N, G, 3) per-environment layout (nominal track + gate randomisation)
     gates_yaw: jax.Array  # (N, G)
+    track_pos: jax.Array  # (N, G, 3) nominal track of the episode (sets the out-of-bounds box)
+    track_yaw: jax.Array  # (N, G)
     target: jax.Array  # (N,) int32 index of the next gate
     prev_action: jax.Array  # (N, 4) clipped
     delay: jax.Array  # (N,) int32 physics steps
@@ -220,8 +234,11 @@ def camera_view(pos, quat, point):
 class RaceEnv:
     """Pure ``reset`` / ``step`` functions over a Crazyflow ``Sim`` (closed over, not mutated)."""
 
-    def __init__(self, cfg: EnvConfig, circuit=track.CIRCUIT, device: str | None = None):
-        """``device``: "gpu" / "cpu" for the simulation data (default: gpu if jax has one)."""
+    def __init__(self, cfg: EnvConfig, circuit=None, device: str | None = None):
+        """``circuit``: fixed nominal layout overriding ``cfg.track``: a list of gates (or a name in
+        `fpv.track.SCENARIOS`), or a tuple of arrays (pos (N, G, 3), yaw (N, G)) with one layout per
+        environment. Default: the layout named by ``cfg.track``, or procedural tracks if it is
+        "random". ``device``: "gpu" / "cpu" for the simulation data (default: gpu if jax has one)."""
         import crazyflow.sim.functional as F
         from crazyflow.control import Control
         from crazyflow.control.transform import motor_force2rotor_vel
@@ -269,25 +286,43 @@ class RaceEnv:
         )
         self.default = data.replace(states=states, params=params, controls=data.controls.replace(body_rate=br))
         self._sim, self._sim_step, self._sim_reset = sim, sim._step, sim._reset
-        gp, gy = track.circuit_arrays(circuit)
+        self.random_tracks = circuit is None and cfg.track == "random"
+        if isinstance(circuit, tuple):
+            gp, gy = (np.asarray(a, np.float32) for a in circuit)
+            assert gp.shape == (n, gp.shape[1], 3) and gy.shape == gp.shape[:2], (gp.shape, gy.shape)
+        else:
+            gp, gy = track.circuit_arrays(track.resolve("circuit" if self.random_tracks else (circuit or cfg.track)))
+        # Fixed nominal layout(s) (also the initial track of every environment with random tracks)
         self.gates_pos, self.gates_yaw = jnp.asarray(gp), jnp.asarray(gy)
-        self.n_gates = gp.shape[0]
-        m = cfg.box_margin
-        self.box_lo = jnp.asarray([gp[:, 0].min() - m, gp[:, 1].min() - m, cfg.ground_z])
-        self.box_hi = jnp.asarray([gp[:, 0].max() + m, gp[:, 1].max() + m, cfg.z_max])
+        self.n_gates = gp.shape[-2]
 
     # region reset
 
-    def _sample(self, key):
-        """Draw a new episode for every environment (masked in by the caller)."""
+    def _tracks(self, key, state, mask, pool: int):
+        """Nominal track of the next episode, (N, G, 3) and (N, G). Random tracks: ``pool`` new tracks
+        are generated and handed to the environments in ``mask`` in order (cycling if more reset);
+        where the generator found no valid candidate the environment keeps its previous track."""
+        n = self.cfg.n_envs
+        if not self.random_tracks:
+            return (jnp.broadcast_to(self.gates_pos, (n, self.n_gates, 3)),
+                    jnp.broadcast_to(self.gates_yaw, (n, self.n_gates)))  # fmt: skip
+        c = self.cfg
+        p_pos, p_yaw, p_ok = track.sample_tracks(key, pool, c.track_candidates, c.track_complexity)
+        slot = (jnp.cumsum(mask) - 1) % pool
+        take = p_ok[slot]
+        return (jnp.where(take[:, None, None], p_pos[slot], state.track_pos),
+                jnp.where(take[:, None], p_yaw[slot], state.track_yaw))  # fmt: skip
+
+    def _sample(self, key, track_pos, track_yaw):
+        """Draw a new episode for every environment (masked in by the caller) on the given tracks."""
         c, n, ng = self.cfg, self.cfg.n_envs, self.n_gates
         ks = jax.random.split(key, 16)
 
         def u(k, shape, r):
             return jax.random.uniform(k, shape, minval=-1.0, maxval=1.0) * r
 
-        gates_pos = self.gates_pos + u(ks[0], (n, ng, 3), c.rand_gate_pos)
-        gates_yaw = self.gates_yaw + u(ks[1], (n, ng), c.rand_gate_yaw)
+        gates_pos = track_pos + u(ks[0], (n, ng, 3), c.rand_gate_pos)
+        gates_yaw = track_yaw + u(ks[1], (n, ng), c.rand_gate_yaw)
         target = jax.random.randint(ks[2], (n,), 0, ng)
         gp, gy = _take_gate(gates_pos, target), _take_gate(gates_yaw, target)
         normal, left = track.gate_axes(gy)
@@ -329,6 +364,8 @@ class RaceEnv:
             prev_action = jnp.where(sel, u(kw[9], (n, 4), 1.0), prev_action)
         d = self.default.params
         return dict(
+            track_pos=track_pos,
+            track_yaw=track_yaw,
             gates_pos=gates_pos,
             gates_yaw=gates_yaw,
             target=target,
@@ -346,8 +383,12 @@ class RaceEnv:
             * (jax.random.uniform(jax.random.fold_in(ks[15], 1), (n,)) < c.p_action_noise),
         )
 
-    def _reset_masked(self, state: EnvState, key, mask) -> EnvState:
-        ep, lr = self._sample(key), self._leaf_replace
+    def _reset_masked(self, state: EnvState, key, mask, pool: int | None = None) -> EnvState:
+        """New episodes where ``mask``. ``pool``: random tracks generated for this call (default
+        ``cfg.track_pool``; pass the number of environments when most of them reset)."""
+        pool = min(pool or self.cfg.track_pool, self.cfg.n_envs)
+        track_pos, track_yaw = self._tracks(jax.random.fold_in(key, 7), state, mask, pool)
+        ep, lr = self._sample(key, track_pos, track_yaw), self._leaf_replace
         data = self._sim_reset(state.data, self.default, mask)
         states = lr(
             data.states, mask, pos=ep["pos"][:, None], quat=ep["quat"][:, None], vel=ep["vel"][:, None],
@@ -365,6 +406,8 @@ class RaceEnv:
 
         return state.replace(
             data=data,
+            track_pos=sel(ep["track_pos"], state.track_pos),
+            track_yaw=sel(ep["track_yaw"], state.track_yaw),
             gates_pos=sel(ep["gates_pos"], state.gates_pos),
             gates_yaw=sel(ep["gates_yaw"], state.gates_yaw),
             target=sel(ep["target"], state.target),
@@ -384,6 +427,8 @@ class RaceEnv:
             data=self.default,
             gates_pos=jnp.zeros((n, ng, 3)),
             gates_yaw=jnp.zeros((n, ng)),
+            track_pos=jnp.broadcast_to(self.gates_pos, (n, ng, 3)),
+            track_yaw=jnp.broadcast_to(self.gates_yaw, (n, ng)),
             target=jnp.zeros(n, jnp.int32),
             prev_action=jnp.zeros((n, 4)),
             delay=jnp.zeros(n, jnp.int32),
@@ -393,7 +438,7 @@ class RaceEnv:
             ep_gates=jnp.zeros(n, jnp.int32),
             key=key,
         )
-        state = self._reset_masked(state, k1, jnp.ones(n, bool))
+        state = self._reset_masked(state, k1, jnp.ones(n, bool), pool=n)
         if random_t:
             state = state.replace(t=jax.random.randint(k2, (n,), 0, self.cfg.max_steps))
         return state, self.obs(state)
@@ -446,7 +491,11 @@ class RaceEnv:
         crash_gate = (wrong_g | hit_g).any(axis=1)
         finite = jnp.isfinite(pos).all(-1) & jnp.isfinite(vel).all(-1) & jnp.isfinite(quat).all(-1)
         ground = finite & (pos[:, 2] < c.ground_z)
-        oob = ~finite | (((pos < self.box_lo) | (pos > self.box_hi)).any(-1) & ~ground)
+        # Out of bounds: box_margin around the episode's nominal track horizontally, ground_z..z_max
+        m, tp = c.box_margin, state.track_pos
+        box_lo = jnp.concatenate([tp[..., :2].min(1) - m, jnp.full((tp.shape[0], 1), c.ground_z)], -1)
+        box_hi = jnp.concatenate([tp[..., :2].max(1) + m, jnp.full((tp.shape[0], 1), c.z_max)], -1)
+        oob = ~finite | (((pos < box_lo) | (pos > box_hi)).any(-1) & ~ground)
         terminated = crash_gate | ground | oob
         t = state.t + 1
         truncated = (t >= c.max_steps) & ~terminated

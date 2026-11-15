@@ -1,0 +1,251 @@
+{
+ "args": {
+  "gpus": [
+   4,
+   5
+  ],
+  "ipg": 8,
+  "res": "320x180",
+  "sync_steps": 2000,
+  "traj_steps": 2000,
+  "rollouts": "runs/teacher/cruise_s1/rollouts.npz",
+  "throughput_steps": 100,
+  "rollout_rounds": 2,
+  "throughput_ipg": [
+   4,
+   8
+  ],
+  "looks": [
+   "stock",
+   "fast"
+  ],
+  "skip": [],
+  "third_person": true,
+  "tp_ipg": 2,
+  "startup_trials": 5,
+  "startup_ipg": 6
+ },
+ "startup_reliability": {
+  "gpus": [
+   4,
+   5
+  ],
+  "instances_per_gpu": 6,
+  "trials": [
+   {
+    "trial": 0,
+    "ok": true,
+    "seconds": 39.3,
+    "slots": 12,
+    "slot_relaunches": 0,
+    "errors": []
+   },
+   {
+    "trial": 1,
+    "ok": true,
+    "seconds": 43.2,
+    "slots": 12,
+    "slot_relaunches": 0,
+    "errors": []
+   },
+   {
+    "trial": 2,
+    "ok": true,
+    "seconds": 45.7,
+    "slots": 12,
+    "slot_relaunches": 0,
+    "errors": []
+   },
+   {
+    "trial": 3,
+    "ok": true,
+    "seconds": 43.0,
+    "slots": 12,
+    "slot_relaunches": 0,
+    "errors": []
+   },
+   {
+    "trial": 4,
+    "ok": true,
+    "seconds": 43.9,
+    "slots": 12,
+    "slot_relaunches": 0,
+    "errors": []
+   }
+  ],
+  "slot_launches": 60,
+  "slot_relaunches": 0,
+  "trials_ok": 5
+ },
+ "renderer": {
+  "gpus": [
+   4,
+   5
+  ],
+  "instances_per_gpu": 2,
+  "size": [
+   640,
+   360
+  ],
+  "hfov_deg": 80.0,
+  "drone_scale": 2.0
+ },
+ "drone_model": {
+  "scale_vs_true_size": 2.0,
+  "motor_to_motor_m": 0.184,
+  "span_incl_rotor_discs_m": 0.224,
+  "height_m": 0.031
+ },
+ "startup_s": 23.2,
+ "chase_camera": {
+  "drone_centre_hidden_by_gate_frac": [
+   0.0,
+   0.0,
+   0.0,
+   0.0
+  ],
+  "min_gate_frame_distance_m": 0.101,
+  "frames_model_visible_frac": 1.0
+ },
+ "flight_chase": {
+  "frames": 1200,
+  "scored": 1200,
+  "model_not_occluded_by_gates": 1200,
+  "of_those_where_neighbour_steps_differ": 1153,
+  "not_detected": 0,
+  "frames_not_matching_own_step": 0,
+  "frames_matching_a_neighbour_step_better": 0,
+  "iou_median_p5": [
+   0.855,
+   0.687
+  ],
+  "centroid_err_px_median_p95_max": [
+   0.78,
+   2.07,
+   3.79
+  ],
+  "model_px_median": 1666,
+  "first_bad": []
+ },
+ "flight_overview": {
+  "frames": 1200,
+  "scored": 1200,
+  "model_not_occluded_by_gates": 996,
+  "of_those_where_neighbour_steps_differ": 996,
+  "not_detected": 0,
+  "frames_not_matching_own_step": 0,
+  "frames_matching_a_neighbour_step_better": 0,
+  "iou_median_p5": [
+   0.671,
+   0.57
+  ],
+  "centroid_err_px_median_p95_max": [
+   0.25,
+   0.6,
+   2.12
+  ],
+  "model_px_median": 99,
+  "first_bad": []
+ },
+ "render_frames_per_s_per_gpu": {
+  "chase": {
+   "frames_per_s_per_gpu": 29.2,
+   "instances_per_gpu": 2,
+   "size": [
+    640,
+    360
+   ]
+  },
+  "overview": {
+   "frames_per_s_per_gpu": 29.0,
+   "instances_per_gpu": 2,
+   "size": [
+    640,
+    360
+   ]
+  }
+ },
+ "random_jumps_render_trajectories": {
+  "frames": 1200,
+  "scored": 1200,
+  "model_not_occluded_by_gates": 1200,
+  "of_those_where_neighbour_steps_differ": 1200,
+  "not_detected": 1,
+  "frames_not_matching_own_step": 0,
+  "frames_matching_a_neighbour_step_better": 0,
+  "iou_median_p5": [
+   0.802,
+   0.578
+  ],
+  "centroid_err_px_median_p95_max": [
+   0.29,
+   1.31,
+   3.28
+  ],
+  "model_px_median": 538,
+  "first_bad": []
+ },
+ "random_jumps_render": {
+  "frames": 240,
+  "scored": 240,
+  "model_not_occluded_by_gates": 240,
+  "of_those_where_neighbour_steps_differ": 240,
+  "not_detected": 0,
+  "frames_not_matching_own_step": 0,
+  "frames_matching_a_neighbour_step_better": 0,
+  "iou_median_p5": [
+   0.804,
+   0.549
+  ],
+  "centroid_err_px_median_p95_max": [
+   0.3,
+   1.22,
+   3.28
+  ],
+  "model_px_median": 575,
+  "first_bad": []
+ },
+ "restarts": 0,
+ "failed_launches": [],
+ "pass": true,
+ "sim_processes_left_after_close": 0,
+ "startup_injected_failure": {
+  "one_failed_first_launch": {
+   "slots": 12,
+   "victim_slot": 7,
+   "seconds": 158.0,
+   "launches": {
+    "7": 2,
+    "8": 1,
+    "4": 1,
+    "2": 1,
+    "3": 1,
+    "11": 1,
+    "0": 1,
+    "1": 1,
+    "6": 1,
+    "5": 1,
+    "9": 1,
+    "10": 1
+   },
+   "failed_launches": [
+    {
+     "slot": 7,
+     "error": "FileNotFoundError: [Errno 2] No such file or directory: '/nonexistent_fpv_airsim_root/blocks/Blocks/Binaries/Linux/Blocks-Linux-Shipping'"
+    }
+   ],
+   "relaunched_alone": true,
+   "victim_frame_mean_abs_diff_to_same_gpu_slots": 0.0,
+   "other_slots_mean_abs_diff_among_themselves": 0.0
+  },
+  "always_failing_slot": {
+   "startup_retries": 2,
+   "seconds": 24.2,
+   "error": "slot(s) [1] failed to start 3 times: FileNotFoundError: [Errno 2] No such file or directory: '/nonexistent_fpv_airsim_root/blocks/Blocks/Binaries/Linux/Blocks-Linux-Shipping'\nelf.sim = subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, start_new_session=True,\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/lib/python3.12/subp",
+   "sims_running_before_on_these_gpus": 0,
+   "sims_running_after_on_these_gpus": 0
+  },
+  "pass": true
+ },
+ "sync_pass": true
+}

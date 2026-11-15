@@ -77,10 +77,20 @@ def main():
           f"mismatching steps {int(mism.sum())}")  # fmt: skip
     adv = (idx[:, 1:] - idx[:, :-1]) % G
     print("target advances exactly on passes:", bool((adv[pair] == d["passed"][:, :-1][pair]).all()))
-    print("gate layout offsets from nominal, max |dpos| / |dyaw| (randomised):",
-          float(np.abs(d["gates_pos"] - track.circuit_arrays()[0]).max()),
-          float(np.abs(d["gates_yaw"] - track.circuit_arrays()[1]).max()),
-          "(nominal):", float(np.abs(d["gates_pos"][d["nominal"]] - track.circuit_arrays()[0]).max()))  # fmt: skip
+    # Nominal layout of each episode: exported since procedural tracks / scenarios, else the circuit
+    tp = d["track_pos"] if "track_pos" in d.files else track.circuit_arrays()[0]
+    ty = d["track_yaw"] if "track_yaw" in d.files else track.circuit_arrays()[1]
+    dyaw = np.abs((d["gates_yaw"] - ty + np.pi) % (2 * np.pi) - np.pi)
+    nom = d["nominal"]
+    print("gate layout offsets from the episode's nominal track, max |dpos| / |dyaw| (randomised):",
+          float(np.abs(d["gates_pos"] - tp)[~nom].max()), float(dyaw[~nom].max()),
+          "(nominal):", float(np.abs(d["gates_pos"] - tp)[nom].max()), float(dyaw[nom].max()))  # fmt: skip
+    if "scenario" in d.files:
+        names = list(d["scenario_names"])
+        for s in np.unique(d["scenario"]):
+            m = d["scenario"] == s
+            print(f"  {'training distribution' if s < 0 else names[s]}: {int(m.sum())} episodes, outcomes",
+                  np.bincount(d["outcome"][m], minlength=4).tolist())  # fmt: skip
 
 
 if __name__ == "__main__":

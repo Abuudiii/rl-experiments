@@ -1,6 +1,7 @@
 """Crazyflow half of closed-loop flight with an external (e.g. vision) policy.
 
-    fb = FlightBatch(n, "runs/teacher/<run>/ckpt_latest.pkl", seed=0, randomize=True, wide_spawn_p=0.0)
+    fb = FlightBatch(n, "runs/teacher/<run>/ckpt_latest.pkl", seed=0, randomize=True, wide_spawn_p=0.0,
+                     scenario=None)
     s = fb.reset()                 # all environments; or fb.reset(mask) for a boolean [n] subset
     while ...:
         s = fb.step(actions)       # float32 [n, 4] in [-1, 1], fpv.env.scale_action mapping, 50 Hz
@@ -10,8 +11,15 @@
 numpy in, numpy out, JAX inside. Device: "gpu" (the first GPU visible through CUDA_VISIBLE_DEVICES),
 "cpu", or None = gpu if jax has one (``JAX_PLATFORMS=cpu`` forces cpu). The environment (reward
 terms aside), randomisation ranges, gate logic, time limit and wide-spawn ranges are those of the
-teacher checkpoint's training config; ``randomize=False`` gives the nominal circuit and nominal
-physics (spawn noise stays), ``wide_spawn_p`` overrides ``p_wide``.
+teacher checkpoint's training config; ``wide_spawn_p`` overrides ``p_wide``.
+
+Layout: ``scenario=None`` flies the checkpoint's training distribution (``cfg.track``: the single
+circuit for teachers trained on it, a new procedural track per episode for ``track="random"``
+teachers); a name in ``fpv.track.SCENARIOS`` or an explicit list of 6 gates fixes the nominal
+layout; a tuple ``(gates_pos [n,6,3], gates_yaw [n,6])`` fixes one nominal layout per environment.
+``randomize=True`` adds the per-gate (+-rand_gate_pos m, +-rand_gate_yaw rad) and physics
+randomisation of the config; ``randomize=False`` gives the nominal layout (or nominal procedural
+tracks) and nominal physics (spawn noise stays).
 
 State dict (leading dim n, describes the CURRENT state, i.e. after the step / reset):
     pos [n,3], quat [n,4] xyzw body-to-world, vel [n,3] world, ang_vel [n,3] body,
@@ -38,15 +46,16 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from fpv import ppo
+from fpv import ppo, track
 from fpv.env import RaceEnv
 
-_EP_FIELDS = ("gates_pos", "gates_yaw", "target", "prev_action", "delay", "act_noise", "t", "ep_return", "ep_gates")
+_EP_FIELDS = ("gates_pos", "gates_yaw", "track_pos", "track_yaw", "target", "prev_action", "delay", "act_noise", "t",
+              "ep_return", "ep_gates")  # fmt: skip
 
 
 class FlightBatch:
     def __init__(self, n: int, teacher_ckpt, seed: int = 0, randomize: bool = True, wide_spawn_p: float = 0.0,
-                 device: str | None = None):  # fmt: skip
+                 device: str | None = None, scenario=None):  # fmt: skip
         from crazyflow.utils import pytree_replace, world_mask
 
         net, params, norm, env_cfg, _, _ = ppo.load_checkpoint(teacher_ckpt)
@@ -54,7 +63,9 @@ class FlightBatch:
         if not randomize:
             cfg = cfg.nominal()
         self.n, self.cfg = n, cfg
-        env = self.env = RaceEnv(cfg, device=device)
+        self.scenario = scenario
+        layout = None if scenario is None else scenario if isinstance(scenario, tuple) else track.resolve(scenario)
+        env = self.env = RaceEnv(cfg, circuit=layout, device=device)
         dev = env.default.states.pos.device
         params, norm = jax.device_put((params, norm), dev)
         self._key = jax.device_put(jax.random.key(seed), dev)
@@ -73,7 +84,7 @@ class FlightBatch:
 
         @jax.jit
         def reset(state, done, outcome, key, mask):
-            state = env._reset_masked(state, key, mask)
+            state = env._reset_masked(state, key, mask, pool=n)
             done, outcome = done & ~mask, jnp.where(mask, 0, outcome)
             return state, done, outcome, view(state, done, outcome, jnp.zeros_like(done))
 

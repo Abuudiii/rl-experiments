@@ -1,13 +1,19 @@
 """Geometry and speed checks of `fpv.render_synth.SynthRenderer`.
 
-    CUDA_VISIBLE_DEVICES=2 .venv-sim/bin/python scripts/check_student_synth_render.py [--sheet out.png]
+    CUDA_VISIBLE_DEVICES=2 .venv-sim/bin/python scripts/check_student_synth_render.py \
+        --teacher runs/teacher/<run>/ckpt_latest.pkl [--sheet out.png]
 
-(i)   poses from runs/teacher/cruise_s1/rollouts.npz: the magenta mask of a clean render against an
-      independent rasterisation (project the gate corners with `project_points`, fill polygons with
-      PIL): IoU per frame; and corner pixels (just inside each outer corner magenta, opening centre not).
+Poses: the teacher flies its training distribution (random tracks for a random-track teacher) with
+off-course starts (`fpv.closed_loop.FlightBatch`); 512 states at random times are used.
+(i)   the magenta mask of a clean render against an independent rasterisation (project the gate
+      corners with `project_points`, fill polygons with PIL): IoU per frame; and corner pixels (just
+      inside each outer corner magenta, opening centre not).
 (ii)  occlusion: where two gate frames overlap in the image the hit map names the nearer gate.
 (iii) horizon: pixels whose ray points above / below the world horizontal are sky / ground.
 (iv)  throughput of the randomised renderer.
+(v)   blocks stay clear of the track: 100,000 random looks place every block outside the grown track
+      volume, and on the flown poses a randomised render shows exactly the same gate pixels as the
+      same render with the blocks removed (no block ever hides or cuts a gate).
 """
 
 from __future__ import annotations
@@ -25,7 +31,7 @@ import numpy as np  # noqa: E402
 from PIL import Image, ImageDraw  # noqa: E402
 
 from fpv import track  # noqa: E402
-from fpv.render_synth import SynthRenderer, _pixel_dirs, project_points  # noqa: E402
+from fpv.render_synth import SynthRenderer, _pixel_dirs, blocks_clear_of_volume, project_points  # noqa: E402
 from fpv.env import quat_to_mat  # noqa: E402
 
 
@@ -57,18 +63,15 @@ def is_magenta(img):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--rollouts", default="runs/teacher/cruise_s1/rollouts.npz")
+    ap.add_argument("--teacher", required=True)
     ap.add_argument("--sheet", default=None)
     ap.add_argument("--width", type=int, default=160)
     ap.add_argument("--height", type=int, default=90)
     args = ap.parse_args()
     w, h = args.width, args.height
-    d = np.load(args.rollouts)
     rng = np.random.default_rng(0)
     n = 512
-    ep = rng.integers(0, d["pos"].shape[0], n)
-    st = np.array([rng.integers(0, d["length"][e]) for e in ep])
-    pos, quat, gp, gy = d["pos"][ep, st], d["quat"][ep, st], d["gates_pos"][ep], d["gates_yaw"][ep]
+    pos, quat, gp, gy, tgt = poses(args.teacher, n, rng)
     res = {}
 
     # (i) clean render against polygon rasterisation
@@ -90,7 +93,6 @@ def main():
                            mean_gate_pixels=float(mag.sum() / n))  # fmt: skip
     # corner test on the target gate: a point 15% inside each outer corner (on the frame) must be
     # magenta or hidden by a nearer gate, the opening centre must not show the target gate itself
-    tgt = d["target"][ep, st].astype(int)
     c_out = track.gate_corners(gp[np.arange(n), tgt], gy[np.arange(n), tgt], track.GATE_OUTER)
     centre = gp[np.arange(n), tgt]
     probe = centre[:, None] + 0.85 * (c_out - centre[:, None])
@@ -143,9 +145,9 @@ def main():
     # (iv) throughput (randomised look, including the copy to the host)
     for nn in (256, 1024):
         rr = SynthRenderer(nn, w, h, seed=1)
-        e2 = rng.integers(0, d["pos"].shape[0], nn)
-        p2, q2 = d["pos"][e2, 100], d["quat"][e2, 100]
-        rr.set_gates(np.arange(nn), d["gates_pos"][e2], d["gates_yaw"][e2])
+        e2 = rng.integers(0, n, nn)
+        p2, q2 = pos[e2], quat[e2]
+        rr.set_gates(np.arange(nn), gp[e2], gy[e2])
         rr.render(p2, q2)
         t0 = time.perf_counter()
         for _ in range(20):
@@ -156,7 +158,37 @@ def main():
             tiles = [out[i] for i in range(12)] + [img[i] for i in range(4)]
             rows = [np.concatenate(tiles[k : k + 4], 1) for k in range(0, 16, 4)]
             Image.fromarray(np.concatenate(rows, 0)).resize((w * 8, h * 8), Image.NEAREST).save(args.sheet)
+
+    # (v) blocks clear of the track
+    rb = SynthRenderer(n, w, h, seed=2)
+    many = rb._draw_scene(100_000)
+    res["blocks_outside_volume"] = float(blocks_clear_of_volume(many["b_pos"], many["b_yaw"], many["b_half"]).mean())
+    rb.set_gates(np.arange(n), gp, gy)
+    _, ids_b = rb.render_ids(pos, quat)
+    rb.scene["b_pos"] = rb.scene["b_pos"] + np.float32(1e4)  # the same look without blocks
+    _, ids_nb = rb.render_ids(pos, quat)
+    g_b, g_nb = (ids_b >= 0) & (ids_b < 6), (ids_nb >= 0) & (ids_nb < 6)
+    res["blocks_vs_gates"] = dict(gate_pixels=int(g_nb.sum()), gate_pixels_changed_by_blocks=int((g_b != g_nb).sum()),
+                                  frames_showing_blocks=float((ids_b >= 6).any((1, 2)).mean()))  # fmt: skip
     print("RESULT " + json.dumps(res, indent=1))
+
+
+def poses(teacher, n, rng, steps=400):
+    """n states of teacher flights (training distribution, off-course starts): pos, quat, gates, target."""
+    from fpv.closed_loop import FlightBatch
+
+    fb = FlightBatch(n, teacher, seed=4242, randomize=True, wide_spawn_p=0.3)
+    s = fb.reset()
+    when = rng.integers(0, steps, n)
+    out = {k: np.zeros_like(s[k]) for k in ("pos", "quat", "gates_pos", "gates_yaw", "target")}
+    for i in range(steps):
+        pick = when == i
+        for k in out:
+            out[k][pick] = s[k][pick]
+        s = fb.step(s["teacher_action"])
+        if s["done"].any():
+            s = fb.reset(s["done"])
+    return out["pos"], out["quat"], out["gates_pos"], out["gates_yaw"], out["target"].astype(int)
 
 
 if __name__ == "__main__":
