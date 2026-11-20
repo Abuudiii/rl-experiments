@@ -1,0 +1,7 @@
+{
+  "desc_accurate": false,
+  "reason": "The description fails A and B: it says entries are always stored under `~/.cache/logslice/` and \"never expire\" with no TTL, and it names `_key()` as the helper, all of which the final diff contradicts. It also omits the `LOGSLICE_CACHE_DIR`/XDG configuration and the `--cache-ttl` flag with its default of 3600. The \"41 s to 0.4 s\" timing is a manual measurement that the diff cannot support.",
+  "model": "claude-haiku-5-5",
+  "cost_usd": 0.00205553,
+  "attempts": 1
+}

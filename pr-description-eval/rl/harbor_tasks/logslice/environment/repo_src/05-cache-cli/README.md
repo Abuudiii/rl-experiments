@@ -1,0 +1,64 @@
+# logslice
+
+`logslice` filters and summarises structured log files from the command line.
+It understands lines of the form
+
+```
+2024-05-01T12:00:00Z INFO [http] GET /index.html 200
+```
+
+(ISO-8601 timestamp, level, `[component]`, message). Lines that don't match are
+skipped. `WARN`, `ERR` and `FATAL` are accepted as aliases for `WARNING`,
+`ERROR` and `CRITICAL`.
+
+## Install
+
+```
+pip install -e .
+```
+
+## Usage
+
+```
+logslice app.log --level warning             # WARNING and above
+logslice app.log -c db -c http               # only these components
+logslice app.log --since 2024-05-01T12:00:00Z --until 2024-05-01T13:00:00Z
+logslice app.log --grep 'timeout|reset'      # regex on the message
+logslice app.log --json                      # JSON lines output
+cat app.log | logslice -                     # read from stdin
+```
+
+### Summaries
+
+`--count-by FIELD` prints record counts instead of records. `FIELD` is one of
+`level`, `component`, `hour` or `day`. Filters are applied first:
+
+```
+$ logslice app.log --level warning --count-by component
+db    41
+http  12
+```
+
+Add `--json` to get a JSON object instead.
+
+### Caching
+
+Parsing dominates the runtime on large files. Pass `--cache` to store the
+parsed records on disk and reuse them on the next run over the same file:
+
+```
+logslice --cache huge.log --count-by level   # parses and caches
+logslice --cache huge.log --level error      # served from the cache
+```
+
+Cached results are stored as JSON in `~/.cache/logslice`, one entry per log
+file. The cache key includes the file's size and modification time, so editing
+or appending to a log invalidates its entry. Entries never expire; delete the
+directory to clear the cache.
+
+## Development
+
+```
+pip install -e . pytest
+pytest
+```

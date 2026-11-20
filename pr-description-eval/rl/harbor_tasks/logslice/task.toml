@@ -1,0 +1,23 @@
+schema_version = "1.4"
+
+[task]
+name = "acme/logslice-pr12-desc"
+description = "Address review comments on PR #12 of logslice (cache dir resolution, --cache-ttl, cache_key rename) and keep the PR description accurate."
+
+[metadata]
+category = "software-engineering"
+source = "pr-description-eval task/ (base variant, CONTRIBUTING=0)"
+reward = "0 if tests_untouched is false, else 0.5*hidden_tests_pass_fraction + 0.5*mean(desc_no_stale_claims, desc_mentions_new_behavior)"
+
+[verifier]
+timeout_sec = 900.0
+environment_mode = "shared"
+
+[agent]
+timeout_sec = 1800.0
+
+[environment]
+# The PR branch pushes to a local bare origin and gh is a local fake, so no network is needed.
+network_mode = "no-network"
+workdir = "/repo"
+build_timeout_sec = 900.0

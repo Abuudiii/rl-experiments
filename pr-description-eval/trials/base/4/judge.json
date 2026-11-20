@@ -1,0 +1,7 @@
+{
+  "desc_accurate": true,
+  "reason": "A holds: the description never claims a fixed cache location, no expiry, or the old `_key` name. B holds: it covers the `LOGSLICE_CACHE_DIR`/XDG configuration, `--cache-ttl` with its 3600 default, and names `cache_key()`. C holds for the flags, defaults, precedence order, `directory=` override, stdin warning, and listed tests, all matching the diff. The 40 s / 41 s to 0.4 s benchmark figures cannot be checked from the diff, but they are measurements rather than code claims, so I did not count them as invented. D holds: it describes the whole `--cache` feature.",
+  "model": "claude-haiku-5-5",
+  "cost_usd": 0.00239303,
+  "attempts": 1
+}

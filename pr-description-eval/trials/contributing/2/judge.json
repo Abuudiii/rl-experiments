@@ -1,0 +1,7 @@
+{
+  "desc_accurate": false,
+  "reason": "Fails A: the description says the cache lives under `~/.cache/logslice/`, that entries never expire and need no TTL, and names `_key()` as the helper, all of which the final diff contradicts (XDG/LOGSLICE_CACHE_DIR resolution, `--cache-ttl`, and `cache_key`). Fails B: it omits the cache-directory configuration, the `--cache-ttl` flag and its default, and the rename.",
+  "model": "claude-haiku-5-5",
+  "cost_usd": 0.00176233,
+  "attempts": 1
+}

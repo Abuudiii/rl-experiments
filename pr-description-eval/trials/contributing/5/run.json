@@ -1,0 +1,23 @@
+{
+  "variant": "contributing",
+  "trial": 5,
+  "image": "pr-desc-task:contributing",
+  "image_id": "sha256:ad8ca0a4fd29c3cbd36cda4cfac7fc6963ed0b4c604d63c73a8ea441679a7a20",
+  "model": "hosted_vllm/qwen3.8-27b",
+  "temperature": 0.7,
+  "top_p": 0.95,
+  "step_limit": 60,
+  "wall_limit_s": 1800,
+  "mini_swe_agent_config": "builtin mini.yaml templates",
+  "errors": [],
+  "agent_exit_status": "Submitted",
+  "agent_seconds": 493.8,
+  "exit_status": "Submitted",
+  "api_calls": 27,
+  "n_actions": 37,
+  "max_prompt_tokens": 34071,
+  "prompt_tokens": 563149,
+  "completion_tokens": 21514,
+  "reasoning_tokens": 10376,
+  "total_seconds": 507.4
+}

@@ -1,0 +1,7 @@
+{
+  "desc_accurate": false,
+  "reason": "Item A fails: the description still says \"The cache key is computed by `_key()`\", but the helper was renamed to `cache_key` in the diff, so `_key` is stale as the current name (the later rename bullet is correct, but it does not cancel this one). The other items hold: the env-var/XDG precedence, the `--cache-ttl` default of 3600, and the listed tests all match the diff.",
+  "model": "claude-haiku-5-5",
+  "cost_usd": 0.00208083,
+  "attempts": 1
+}

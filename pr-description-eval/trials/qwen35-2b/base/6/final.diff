@@ -1,0 +1,283 @@
+diff --git a/README.md b/README.md
+index 6e7c258..4d184cd 100644
+--- a/README.md
++++ b/README.md
+@@ -41,6 +41,21 @@ http  12
+ 
+ Add `--json` to get a JSON object instead.
+ 
++### Caching
++
++Parsing dominates the runtime on large files. Pass `--cache` to store the
++parsed records on disk and reuse them on the next run over the same file:
++
++```
++logslice --cache huge.log --count-by level   # parses and caches
++logslice --cache huge.log --level error      # served from the cache
++```
++
++Cached results are stored as JSON in `~/.cache/logslice`, one entry per log
++file. The cache key includes the file's size and modification time, so editing
++or appending to a log invalidates its entry. Entries never expire; delete the
++directory to clear the cache.
++
+ ## Development
+ 
+ ```
+diff --git a/logslice/cache.py b/logslice/cache.py
+new file mode 100644
+index 0000000..7f3c994
+--- /dev/null
++++ b/logslice/cache.py
+@@ -0,0 +1,61 @@
++"""On-disk cache of parsed log records.
++
++Parsing is the slow part of logslice on large files, so ``--cache`` stores the
++parsed records as JSON and reuses them on the next run over the same file.
++"""
++
++from __future__ import annotations
++
++import hashlib
++import json
++import os
++import time
++from pathlib import Path
++
++from .parser import Record
++
++CACHE_DIR = Path.home() / ".cache" / "logslice"
++FORMAT_VERSION = 1
++
++
++def _key(path: Path) -> str:
++    stat = path.stat()
++    raw = f"{path.resolve()}\0{stat.st_size}\0{stat.st_mtime_ns}"
++    return hashlib.sha256(raw.encode()).hexdigest()
++
++
++def _entry_path(path: Path, directory: Path) -> Path:
++    return directory / f"{_key(path)}.json"
++
++
++def load(path: str | Path, directory: str | Path | None = None) -> list[Record] | None:
++    """Return the cached records for ``path``, or ``None`` on a cache miss.
++
++    Entries never expire: the key changes whenever the file is modified, so a
++    stale entry is simply never looked up again.
++    """
++    entry = _entry_path(Path(path), Path(directory) if directory else CACHE_DIR)
++    try:
++        data = json.loads(entry.read_text())
++    except (OSError, ValueError):
++        return None
++    if data.get("version") != FORMAT_VERSION:
++        return None
++    return [Record.from_dict(item) for item in data["records"]]
++
++
++def store(path: str | Path, records: list[Record], directory: str | Path | None = None) -> Path:
++    """Write ``records`` to the cache entry for ``path`` and return its location."""
++    directory = Path(directory) if directory else CACHE_DIR
++    directory.mkdir(parents=True, exist_ok=True)
++    entry = _entry_path(Path(path), directory)
++    data = {
++        "version": FORMAT_VERSION,
++        "source": str(Path(path).resolve()),
++        "created_at": time.time(),
++        "records": [record.to_dict() for record in records],
++    }
++    tmp = entry.with_suffix(f".{os.getpid()}.tmp")
++    tmp.write_text(json.dumps(data))
++    os.replace(tmp, entry)
++    return entry
+diff --git a/logslice/cli.py b/logslice/cli.py
+index 2be8bdc..b720db7 100644
+--- a/logslice/cli.py
++++ b/logslice/cli.py
+@@ -6,7 +6,7 @@ import argparse
+ import json
+ import sys
+ 
+-from . import __version__
++from . import __version__, cache
+ from .aggregate import FIELDS, count_by, format_counts
+ from .filters import filter_records
+ from .parser import LEVELS, Record, parse_file, parse_lines, parse_timestamp
+@@ -33,6 +33,10 @@ def build_parser() -> argparse.ArgumentParser:
+         "--count-by", choices=FIELDS, metavar="FIELD",
+         help=f"print record counts grouped by FIELD ({', '.join(FIELDS)}) instead of records",
+     )
++    parser.add_argument(
++        "--cache", action="store_true",
++        help="reuse parsed records from the on-disk cache (~/.cache/logslice)",
++    )
+     parser.add_argument("--json", action="store_true", help="emit JSON lines instead of text")
+     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
+     return parser
+@@ -40,8 +44,16 @@ def build_parser() -> argparse.ArgumentParser:
+ 
+ def read_records(args: argparse.Namespace) -> list[Record]:
+     if args.path == "-":
++        if args.cache:
++            print("logslice: --cache is ignored when reading from stdin", file=sys.stderr)
+         return list(parse_lines(sys.stdin))
+-    return parse_file(args.path)
++    if not args.cache:
++        return parse_file(args.path)
++    records = cache.load(args.path)
++    if records is None:
++        records = parse_file(args.path)
++        cache.store(args.path, records)
++    return records
+ 
+ 
+ def main(argv: list[str] | None = None) -> int:
+diff --git a/test_type_hints.py b/test_type_hints.py
+new file mode 100644
+index 0000000..15f049c
+--- /dev/null
++++ b/test_type_hints.py
+@@ -0,0 +1,40 @@
++#!/usr/bin/env python3
++"""Test script to verify type hints are correctly formatted."""
++
++import ast
++import inspect
++import sys
++
++def check_type_hints(file_path):
++    """Check if all type hints have proper -> alignment."""
++    with open(file_path, 'r') as f:
++        content = f.read()
++    
++    try:
++        tree = ast.parse(content)
++    except SyntaxError as e:
++        print(f"Syntax error in {file_path}: {e}")
++        return False
++    
++    issues = []
++    for node in ast.walk(tree):
++        if isinstance(node, ast.FunctionDef):
++            if node.returns:
++                # Check if the return type annotation is properly aligned
++                if node.returns.lineno != node.end_lineno:
++                    issues.append(f"Return type annotation on line {node.returns.lineno} is not aligned")
++    
++    return len(issues) == 0
++
++if __name__ == "__main__":
++    files = [
++        "/repo/logslice/parser.py",
++        "/repo/logslice/aggregate.py",
++        "/repo/logslice/cli.py",
++    ]
++    
++    for file in files:
++        result = check_type_hints(file)
++        print(f"{file}: {'PASS' if result else 'FAIL'}")
++        if not result:
++            print(f"  Issues: {check_type_hints(file)}")
+diff --git a/tests/test_cache.py b/tests/test_cache.py
+new file mode 100644
+index 0000000..a27d518
+--- /dev/null
++++ b/tests/test_cache.py
+@@ -0,0 +1,60 @@
++import json
++
++from logslice import cache
++from logslice.parser import parse_file
++
++SAMPLE = """\
++2024-05-01T12:00:00Z INFO [http] GET /index.html 200
++2024-05-01T12:00:05Z ERROR [db] connection reset by peer
++"""
++
++
++def make_log(tmp_path, text=SAMPLE):
++    path = tmp_path / "app.log"
++    path.write_text(text)
++    return path
++
++
++def test_round_trip(tmp_path):
++    log = make_log(tmp_path)
++    records = parse_file(log)
++    entry = cache.store(log, records, directory=tmp_path / "cache")
++    assert entry.parent == tmp_path / "cache"
++    assert cache.load(log, directory=tmp_path / "cache") == records
++
++
++def test_miss_on_empty_cache(tmp_path):
++    log = make_log(tmp_path)
++    assert cache.load(log, directory=tmp_path / "cache") is None
++
++
++def test_key_changes_when_file_changes(tmp_path):
++    log = make_log(tmp_path)
++    before = cache._key(log)
++    with open(log, "a") as handle:
++        handle.write("2024-05-01T12:00:09Z INFO [http] GET /about 200\n")
++    assert cache._key(log) != before
++
++
++def test_modified_file_is_a_miss(tmp_path):
++    log = make_log(tmp_path)
++    cache.store(log, parse_file(log), directory=tmp_path / "cache")
++    with open(log, "a") as handle:
++        handle.write("2024-05-01T12:00:09Z INFO [http] GET /about 200\n")
++    assert cache.load(log, directory=tmp_path / "cache") is None
++
++
++def test_corrupt_entry_is_a_miss(tmp_path):
++    log = make_log(tmp_path)
++    entry = cache.store(log, parse_file(log), directory=tmp_path / "cache")
++    entry.write_text("{not json")
++    assert cache.load(log, directory=tmp_path / "cache") is None
++
++
++def test_entry_records_metadata(tmp_path):
++    log = make_log(tmp_path)
++    entry = cache.store(log, parse_file(log), directory=tmp_path / "cache")
++    data = json.loads(entry.read_text())
++    assert data["version"] == cache.FORMAT_VERSION
++    assert data["source"] == str(log.resolve())
++    assert isinstance(data["created_at"], float)
+diff --git a/tests/test_cli.py b/tests/test_cli.py
+index 53201f5..167ac86 100644
+--- a/tests/test_cli.py
++++ b/tests/test_cli.py
+@@ -2,6 +2,7 @@ import json
+ 
+ import pytest
+ 
++from logslice import cache
+ from logslice.cli import main
+ 
+ SAMPLE = """\
+@@ -53,3 +54,23 @@ def test_count_by_json(log_file, capsys):
+ def test_missing_file_exit_code(tmp_path, capsys):
+     assert main([str(tmp_path / "nope.log")]) == 2
+     assert "nope.log" in capsys.readouterr().err
++
++
++def test_cache_flag_reuses_parsed_records(log_file, tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cache, "CACHE_DIR", tmp_path / "cache")
++    assert main([str(log_file), "--cache", "--count-by", "level"]) == 0
++    first = capsys.readouterr().out
++    assert len(list((tmp_path / "cache").glob("*.json"))) == 1
++
++    def fail(path):
++        raise AssertionError("parse_file should not be called on a cache hit")
++
++    monkeypatch.setattr("logslice.cli.parse_file", fail)
++    assert main([str(log_file), "--cache", "--count-by", "level"]) == 0
++    assert capsys.readouterr().out == first
++
++
++def test_no_cache_without_flag(log_file, tmp_path, monkeypatch):
++    monkeypatch.setattr(cache, "CACHE_DIR", tmp_path / "cache")
++    main([str(log_file)])
++    assert not (tmp_path / "cache").exists()

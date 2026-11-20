@@ -1,0 +1,23 @@
+{
+  "variant": "base",
+  "trial": 3,
+  "image": "pr-desc-task:base",
+  "image_id": "sha256:4b5322448bcb8fe5d637f6965409cc20e91e77d92e11dafb627c5fad63f5c8ee",
+  "model": "hosted_vllm/qwen35-2b",
+  "temperature": 0.7,
+  "top_p": 0.95,
+  "step_limit": 60,
+  "wall_limit_s": 1800,
+  "mini_swe_agent_config": "builtin mini.yaml templates",
+  "errors": [],
+  "agent_exit_status": "LimitsExceeded",
+  "agent_seconds": 70.8,
+  "exit_status": "LimitsExceeded",
+  "api_calls": 60,
+  "n_actions": 60,
+  "max_prompt_tokens": 21037,
+  "prompt_tokens": 839221,
+  "completion_tokens": 6232,
+  "reasoning_tokens": 3633,
+  "total_seconds": 82.7
+}

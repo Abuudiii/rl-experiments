@@ -1,0 +1,7 @@
+{
+  "desc_accurate": true,
+  "reason": "A holds: the description does not claim a fixed ~/.cache location, says entries expire, and uses cache_key rather than _key. B holds: it covers LOGSLICE_CACHE_DIR, XDG_CACHE_HOME, --cache-ttl with its 3600 default, and names the new cache_key helper. C holds: the flag, defaults, precedence order, load() ttl argument, stdin warning, and listed tests all match the diff. The manual timing figures are not verifiable from the diff, but they are not among the categories the rubric checks. D holds: the description still covers the whole --cache feature.",
+  "model": "claude-haiku-5-5",
+  "cost_usd": 0.0022594299999999998,
+  "attempts": 1
+}

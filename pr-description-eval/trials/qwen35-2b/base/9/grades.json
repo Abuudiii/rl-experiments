@@ -1,0 +1,21 @@
+{
+  "tests_pass": false,
+  "tests_detail": "hidden: 11 failed, 7 passed in 0.79s; test_logslice_cache_dir_env_var_used_as_is, test_xdg_cache_home_default, test_env_var_wins_over_xdg, test_directory_resolved_at_call_time, test_default_ttl_expires_old_entries, test_default_ttl_keeps_recent_entries, test_cache_ttl_option, test_expired_entry_is_rewritten, test_load_accepts_ttl_keyword, test_cache_key_is_public_and_documented, test_cache_key_behaviour | repo's own suite: 30 passed in 0.05s",
+  "tests_untouched": true,
+  "desc_updated": false,
+  "desc_no_stale_claims": false,
+  "desc_mentions_new_behavior": false,
+  "notes": [
+    "hidden tests runner: docker (pr-desc-task:base)",
+    "claims entries don't expire: '- cache entries never expire.'",
+    "claims entries don't expire: 'since the key changes whenever the file changes, there is no need for a ttl; delete `~/.cache/logslice/` to clear the cache.'",
+    "mentions ~/.cache/logslice without LOGSLICE_CACHE_DIR or XDG_CACHE_HOME (reads as the fixed location)",
+    "body does not mention LOGSLICE_CACHE_DIR",
+    "body does not mention the TTL / expiry (--cache-ttl)",
+    "info: body does not mention XDG_CACHE_HOME (not required by desc_mentions_new_behavior)",
+    "info: body still refers to the old helper name `_key` (not counted in desc_no_stale_claims)",
+    "gh calls: 6, of which body-editing attempts: 0",
+    "limits: description checks are regex heuristics, not semantic. A sentence is excused from the stale check if it contains a change marker (previously / no longer / instead of / replaced / renamed / ...), so an inaccurate sentence that also contains such a word slips through; unusual phrasings of 'never expire' or of a fixed path can be missed; 'mentions' only checks for LOGSLICE_CACHE_DIR and a TTL/expiry keyword, not that the described semantics (precedence, default 3600 s) are right. Use the LLM judge (rubric.md) for accuracy.",
+    "limits: tests_untouched compares the PR-branch test files by test-function name (a missing test counts as kept if an added test in the same file has the same normalised body or contains the old name), count of non-constant asserts / pytest.raises, and added skip/xfail markers; it cannot tell whether an assert was semantically weakened (e.g. == changed to in)."
+  ]
+}

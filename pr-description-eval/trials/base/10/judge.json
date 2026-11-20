@@ -1,0 +1,7 @@
+{
+  "desc_accurate": false,
+  "reason": "Fails A (stale claims): the description says entries live under `~/.cache/logslice/` and \"never expire\", both contradicted by the final diff's env-var/XDG resolution and `--cache-ttl`/`ttl` expiry, and it names the key helper as `_key()` when it is now `cache_key`. It also fails B, since none of the reviewer-driven changes (the `LOGSLICE_CACHE_DIR`/XDG configuration, the TTL flag, or the rename) are mentioned.",
+  "model": "claude-haiku-5-5",
+  "cost_usd": 0.00193343,
+  "attempts": 1
+}

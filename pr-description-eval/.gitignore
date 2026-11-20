@@ -1,0 +1,6 @@
+# Unfinished task-family generation (stopped before validation)
+tasks/
+taskgen/
+logs/
+__pycache__/
+*.pyc

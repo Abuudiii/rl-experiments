@@ -1,0 +1,326 @@
+diff --git a/README.md b/README.md
+index 6e7c258..614c1be 100644
+--- a/README.md
++++ b/README.md
+@@ -41,6 +41,30 @@ http  12
+ 
+ Add `--json` to get a JSON object instead.
+ 
++### Caching
++
++Parsing dominates the runtime on large files. Pass `--cache` to store the
++parsed records on disk and reuse them on the next run over the same file:
++
++```
++logslice --cache huge.log --count-by level   # parses and caches
++logslice --cache huge.log --level error      # served from the cache
++```
++
++Cached results are stored as JSON, one entry per log file. The cache key
++includes the file's size and modification time, so editing or appending to a
++log invalidates its entry. Entries also expire: by default after one hour,
++configurable with `--cache-ttl SECONDS` (e.g. `--cache --cache-ttl 60` for a
++one-minute TTL).
++
++The cache directory is resolved in this order:
++
++1. `$LOGSLICE_CACHE_DIR`, used as-is, if set and non-empty;
++2. `$XDG_CACHE_HOME/logslice`, if `XDG_CACHE_HOME` is set and non-empty;
++3. `~/.cache/logslice`.
++
++Delete the directory to clear the cache.
++
+ ## Development
+ 
+ ```
+diff --git a/logslice/cache.py b/logslice/cache.py
+new file mode 100644
+index 0000000..9092489
+--- /dev/null
++++ b/logslice/cache.py
+@@ -0,0 +1,96 @@
++"""On-disk cache of parsed log records.
++
++Parsing is the slow part of logslice on large files, so ``--cache`` stores the
++parsed records as JSON and reuses them on the next run over the same file.
++"""
++
++from __future__ import annotations
++
++import hashlib
++import json
++import os
++import time
++from pathlib import Path
++
++from .parser import Record
++
++FORMAT_VERSION = 1
++DEFAULT_TTL = 3600
++
++
++def default_cache_dir() -> Path:
++    """Return the directory cache entries are stored in.
++
++    Resolved lazily (at call time, not import time) in this order:
++
++    1. ``$LOGSLICE_CACHE_DIR``, used as-is, if set and non-empty;
++    2. ``$XDG_CACHE_HOME/logslice``, if ``XDG_CACHE_HOME`` is set and non-empty;
++    3. ``~/.cache/logslice``.
++    """
++    env_dir = os.environ.get("LOGSLICE_CACHE_DIR")
++    if env_dir:
++        return Path(env_dir)
++    xdg = os.environ.get("XDG_CACHE_HOME")
++    if xdg:
++        return Path(xdg) / "logslice"
++    return Path.home() / ".cache" / "logslice"
++
++
++def cache_key(path: Path) -> str:
++    """Return the cache key for ``path``.
++
++    The key is a SHA-256 over the file's resolved path, size and mtime, so
++    editing, appending to or moving the file produces a different key.
++    """
++    stat = path.stat()
++    raw = f"{path.resolve()}\0{stat.st_size}\0{stat.st_mtime_ns}"
++    return hashlib.sha256(raw.encode()).hexdigest()
++
++
++def _entry_path(path: Path, directory: Path) -> Path:
++    return directory / f"{cache_key(path)}.json"
++
++
++def _resolve_dir(directory: str | Path | None) -> Path:
++    return Path(directory) if directory else default_cache_dir()
++
++
++def load(
++    path: str | Path,
++    directory: str | Path | None = None,
++    ttl: float = DEFAULT_TTL,
++) -> list[Record] | None:
++    """Return the cached records for ``path``, or ``None`` on a cache miss.
++
++    ``directory`` overrides the default cache location. An entry is treated as
++    a miss once it is more than ``ttl`` seconds old (see ``created_at``), so
++    callers can bound how long results are reused.
++    """
++    entry = _entry_path(Path(path), _resolve_dir(directory))
++    try:
++        data = json.loads(entry.read_text())
++    except (OSError, ValueError):
++        return None
++    if data.get("version") != FORMAT_VERSION:
++        return None
++    created_at = data.get("created_at")
++    if created_at is None or (time.time() - created_at) > ttl:
++        return None
++    return [Record.from_dict(item) for item in data["records"]]
++
++
++def store(path: str | Path, records: list[Record], directory: str | Path | None = None) -> Path:
++    """Write ``records`` to the cache entry for ``path`` and return its location."""
++    directory = _resolve_dir(directory)
++    directory.mkdir(parents=True, exist_ok=True)
++    entry = _entry_path(Path(path), directory)
++    data = {
++        "version": FORMAT_VERSION,
++        "source": str(Path(path).resolve()),
++        "created_at": time.time(),
++        "records": [record.to_dict() for record in records],
++    }
++    tmp = entry.with_suffix(f".{os.getpid()}.tmp")
++    tmp.write_text(json.dumps(data))
++    os.replace(tmp, entry)
++    return entry
+diff --git a/logslice/cli.py b/logslice/cli.py
+index 2be8bdc..73e2a9a 100644
+--- a/logslice/cli.py
++++ b/logslice/cli.py
+@@ -6,7 +6,7 @@ import argparse
+ import json
+ import sys
+ 
+-from . import __version__
++from . import __version__, cache
+ from .aggregate import FIELDS, count_by, format_counts
+ from .filters import filter_records
+ from .parser import LEVELS, Record, parse_file, parse_lines, parse_timestamp
+@@ -33,6 +33,14 @@ def build_parser() -> argparse.ArgumentParser:
+         "--count-by", choices=FIELDS, metavar="FIELD",
+         help=f"print record counts grouped by FIELD ({', '.join(FIELDS)}) instead of records",
+     )
++    parser.add_argument(
++        "--cache", action="store_true",
++        help="reuse parsed records from the on-disk cache",
++    )
++    parser.add_argument(
++        "--cache-ttl", type=int, default=3600, metavar="SECONDS",
++        help="with --cache, treat cached entries older than SECONDS as a miss (default: 3600)",
++    )
+     parser.add_argument("--json", action="store_true", help="emit JSON lines instead of text")
+     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
+     return parser
+@@ -40,8 +48,16 @@ def build_parser() -> argparse.ArgumentParser:
+ 
+ def read_records(args: argparse.Namespace) -> list[Record]:
+     if args.path == "-":
++        if args.cache:
++            print("logslice: --cache is ignored when reading from stdin", file=sys.stderr)
+         return list(parse_lines(sys.stdin))
+-    return parse_file(args.path)
++    if not args.cache:
++        return parse_file(args.path)
++    records = cache.load(args.path, ttl=args.cache_ttl)
++    if records is None:
++        records = parse_file(args.path)
++        cache.store(args.path, records)
++    return records
+ 
+ 
+ def main(argv: list[str] | None = None) -> int:
+diff --git a/tests/test_cache.py b/tests/test_cache.py
+new file mode 100644
+index 0000000..055bde7
+--- /dev/null
++++ b/tests/test_cache.py
+@@ -0,0 +1,109 @@
++import json
++import time
++from pathlib import Path
++
++from logslice import cache
++from logslice.parser import parse_file
++
++SAMPLE = """\
++2024-05-01T12:00:00Z INFO [http] GET /index.html 200
++2024-05-01T12:00:05Z ERROR [db] connection reset by peer
++"""
++
++
++def make_log(tmp_path, text=SAMPLE):
++    path = tmp_path / "app.log"
++    path.write_text(text)
++    return path
++
++
++def test_round_trip(tmp_path):
++    log = make_log(tmp_path)
++    records = parse_file(log)
++    entry = cache.store(log, records, directory=tmp_path / "cache")
++    assert entry.parent == tmp_path / "cache"
++    assert cache.load(log, directory=tmp_path / "cache") == records
++
++
++def test_miss_on_empty_cache(tmp_path):
++    log = make_log(tmp_path)
++    assert cache.load(log, directory=tmp_path / "cache") is None
++
++
++def test_key_changes_when_file_changes(tmp_path):
++    log = make_log(tmp_path)
++    before = cache.cache_key(log)
++    with open(log, "a") as handle:
++        handle.write("2024-05-01T12:00:09Z INFO [http] GET /about 200\n")
++    assert cache.cache_key(log) != before
++
++
++def test_modified_file_is_a_miss(tmp_path):
++    log = make_log(tmp_path)
++    cache.store(log, parse_file(log), directory=tmp_path / "cache")
++    with open(log, "a") as handle:
++        handle.write("2024-05-01T12:00:09Z INFO [http] GET /about 200\n")
++    assert cache.load(log, directory=tmp_path / "cache") is None
++
++
++def test_corrupt_entry_is_a_miss(tmp_path):
++    log = make_log(tmp_path)
++    entry = cache.store(log, parse_file(log), directory=tmp_path / "cache")
++    entry.write_text("{not json")
++    assert cache.load(log, directory=tmp_path / "cache") is None
++
++
++def test_entry_records_metadata(tmp_path):
++    log = make_log(tmp_path)
++    entry = cache.store(log, parse_file(log), directory=tmp_path / "cache")
++    data = json.loads(entry.read_text())
++    assert data["version"] == cache.FORMAT_VERSION
++    assert data["source"] == str(log.resolve())
++    assert isinstance(data["created_at"], float)
++
++
++def test_fresh_entry_is_a_hit(tmp_path):
++    log = make_log(tmp_path)
++    records = parse_file(log)
++    cache.store(log, records, directory=tmp_path / "cache")
++    assert cache.load(log, directory=tmp_path / "cache", ttl=3600) == records
++
++
++def test_expired_entry_is_a_miss(tmp_path):
++    log = make_log(tmp_path)
++    entry = cache.store(log, parse_file(log), directory=tmp_path / "cache")
++    # Backdate the entry by two hours so it exceeds the default 3600s TTL.
++    data = json.loads(entry.read_text())
++    data["created_at"] = time.time() - 7200
++    entry.write_text(json.dumps(data))
++    assert cache.load(log, directory=tmp_path / "cache", ttl=3600) is None
++    # A larger TTL still considers the entry fresh.
++    assert cache.load(log, directory=tmp_path / "cache", ttl=7201) is not None
++
++
++def test_default_cache_dir_logslice_env(tmp_path, monkeypatch):
++    monkeypatch.setenv("LOGSLICE_CACHE_DIR", str(tmp_path / "custom"))
++    assert cache.default_cache_dir() == tmp_path / "custom"
++
++
++def test_default_cache_dir_xdg(tmp_path, monkeypatch):
++    monkeypatch.delenv("LOGSLICE_CACHE_DIR", raising=False)
++    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "xdg"))
++    assert cache.default_cache_dir() == tmp_path / "xdg" / "logslice"
++
++
++def test_default_cache_dir_fallback(tmp_path, monkeypatch):
++    monkeypatch.delenv("LOGSLICE_CACHE_DIR", raising=False)
++    monkeypatch.delenv("XDG_CACHE_HOME", raising=False)
++    assert cache.default_cache_dir() == Path.home() / ".cache" / "logslice"
++
++
++def test_explicit_directory_wins_over_env(tmp_path, monkeypatch):
++    monkeypatch.setenv("LOGSLICE_CACHE_DIR", str(tmp_path / "custom"))
++    log = make_log(tmp_path)
++    records = parse_file(log)
++    entry = cache.store(log, records, directory=tmp_path / "explicit")
++    assert entry.parent == tmp_path / "explicit"
++    assert cache.load(log, directory=tmp_path / "explicit") == records
++    # Nothing was written to the env-configured directory.
++    assert not (tmp_path / "custom").exists()
+diff --git a/tests/test_cli.py b/tests/test_cli.py
+index 53201f5..cbc3e02 100644
+--- a/tests/test_cli.py
++++ b/tests/test_cli.py
+@@ -53,3 +53,23 @@ def test_count_by_json(log_file, capsys):
+ def test_missing_file_exit_code(tmp_path, capsys):
+     assert main([str(tmp_path / "nope.log")]) == 2
+     assert "nope.log" in capsys.readouterr().err
++
++
++def test_cache_flag_reuses_parsed_records(log_file, tmp_path, monkeypatch, capsys):
++    monkeypatch.setenv("LOGSLICE_CACHE_DIR", str(tmp_path / "cache"))
++    assert main([str(log_file), "--cache", "--count-by", "level"]) == 0
++    first = capsys.readouterr().out
++    assert len(list((tmp_path / "cache").glob("*.json"))) == 1
++
++    def fail(path):
++        raise AssertionError("parse_file should not be called on a cache hit")
++
++    monkeypatch.setattr("logslice.cli.parse_file", fail)
++    assert main([str(log_file), "--cache", "--count-by", "level"]) == 0
++    assert capsys.readouterr().out == first
++
++
++def test_no_cache_without_flag(log_file, tmp_path, monkeypatch):
++    monkeypatch.setenv("LOGSLICE_CACHE_DIR", str(tmp_path / "cache"))
++    main([str(log_file)])
++    assert not (tmp_path / "cache").exists()

@@ -1,0 +1,442 @@
+diff --git a/README.md b/README.md
+index 6e7c258..4d184cd 100644
+--- a/README.md
++++ b/README.md
+@@ -41,6 +41,21 @@ http  12
+ 
+ Add `--json` to get a JSON object instead.
+ 
++### Caching
++
++Parsing dominates the runtime on large files. Pass `--cache` to store the
++parsed records on disk and reuse them on the next run over the same file:
++
++```
++logslice --cache huge.log --count-by level   # parses and caches
++logslice --cache huge.log --level error      # served from the cache
++```
++
++Cached results are stored as JSON in `~/.cache/logslice`, one entry per log
++file. The cache key includes the file's size and modification time, so editing
++or appending to a log invalidates its entry. Entries never expire; delete the
++directory to clear the cache.
++
+ ## Development
+ 
+ ```
+diff --git a/logslice/cache.py b/logslice/cache.py
+new file mode 100644
+index 0000000..9acfdc8
+--- /dev/null
++++ b/logslice/cache.py
+@@ -0,0 +1,112 @@
++"""On-disk cache of parsed log records.
++
++Parsing is the slow part of logslice on large files, so ``--cache`` stores the
++parsed records as JSON and reuses them on the next run over the same file.
++"""
++
++from __future__ import annotations
++
++import hashlib
++import json
++import os
++import time
++from pathlib import Path
++
++from .parser import Record
++
++# Backward compatibility constant
++CACHE_DIR = Path.home() / ".cache" / "logslice"
++FORMAT_VERSION = 1
++DEFAULT_TTL = 3600  # Default cache TTL in seconds (1 hour)
++
++
++def resolve_cache_dir(directory: str | Path | None = None) -> Path:
++    """Resolve the cache directory using XDG spec with fallback.
++    
++    Returns the cache directory in this priority order:
++    1. `directory` argument (if provided)
++    2. $LOGSLICE_CACHE_DIR (if set and non-empty)
++    3. $XDG_CACHE_HOME/logslice (if XDG_CACHE_HOME is set and non-empty)
++    4. ~/.cache/logslice (default)
++    """
++    if directory is not None:
++        return Path(directory)
++    
++    env_dir = os.environ.get("LOGSLICE_CACHE_DIR")
++    if env_dir:
++        return Path(env_dir)
++    
++    xdg_cache = os.environ.get("XDG_CACHE_HOME")
++    if xdg_cache:
++        return Path(xdg_cache) / "logslice"
++    
++    return Path.home() / ".cache" / "logslice"
++
++
++def cache_key(path: Path) -> str:
++    """Generate a cache key for a log file.
++    
++    The key is computed from the file's resolved path, size, and mtime,
++    so the cache entry is invalidated when the file is edited or appended to.
++    
++    Args:
++        path: The log file path
++        
++    Returns:
++        A SHA-256 hash of the file metadata
++    """
++    stat = path.stat()
++    raw = f"{path.resolve()}\0{stat.st_size}\0{stat.st_mtime_ns}"
++    return hashlib.sha256(raw.encode()).hexdigest()
++
++
++def _entry_path(path: Path, directory: Path) -> Path:
++    return directory / f"{cache_key(path)}.json"
++
++
++def load(path: str | Path, directory: str | Path | None = None, ttl: int | None = None) -> list[Record] | None:
++    """Return the cached records for ``path``, or ``None`` on a cache miss.
++    
++    Args:
++        path: The log file path
++        directory: Optional cache directory (overrides environment defaults)
++        ttl: Time-to-live in seconds. Entries older than this are treated as misses.
++             Default is 3600 seconds (1 hour).
++    
++    Returns:
++        The cached records or None on miss
++    """
++    directory = resolve_cache_dir(directory)
++    entry = _entry_path(Path(path), directory)
++    try:
++        data = json.loads(entry.read_text())
++    except (OSError, ValueError):
++        return None
++    if data.get("version") != FORMAT_VERSION:
++        return None
++    
++    # Check TTL if specified or not None (default is 3600)
++    if ttl is not None:
++        if "created_at" in data and data["created_at"] + ttl < time.time():
++            return None
++    elif "created_at" in data and data["created_at"] + DEFAULT_TTL < time.time():
++        return None
++    
++    return [Record.from_dict(item) for item in data["records"]]
++
++
++def store(path: str | Path, records: list[Record], directory: str | Path | None = None) -> Path:
++    """Write ``records`` to the cache entry for ``path`` and return its location."""
++    directory = resolve_cache_dir(directory)
++    directory.mkdir(parents=True, exist_ok=True)
++    entry = _entry_path(Path(path), directory)
++    data = {
++        "version": FORMAT_VERSION,
++        "source": str(Path(path).resolve()),
++        "created_at": time.time(),
++        "records": [record.to_dict() for record in records],
++    }
++    tmp = entry.with_suffix(f".{os.getpid()}.tmp")
++    tmp.write_text(json.dumps(data))
++    os.replace(tmp, entry)
++    return entry
+diff --git a/logslice/cli.py b/logslice/cli.py
+index 2be8bdc..1919289 100644
+--- a/logslice/cli.py
++++ b/logslice/cli.py
+@@ -6,7 +6,7 @@ import argparse
+ import json
+ import sys
+ 
+-from . import __version__
++from . import __version__, cache
+ from .aggregate import FIELDS, count_by, format_counts
+ from .filters import filter_records
+ from .parser import LEVELS, Record, parse_file, parse_lines, parse_timestamp
+@@ -33,6 +33,14 @@ def build_parser() -> argparse.ArgumentParser:
+         "--count-by", choices=FIELDS, metavar="FIELD",
+         help=f"print record counts grouped by FIELD ({', '.join(FIELDS)}) instead of records",
+     )
++    parser.add_argument(
++        "--cache", action="store_true",
++        help="reuse parsed records from the on-disk cache (directory configurable via LOGSLICE_CACHE_DIR, XDG_CACHE_HOME, or ~/.cache/logslice)",
++    )
++    parser.add_argument(
++        "--cache-ttl", type=int, metavar="SECONDS",
++        help="time-to-live for cache entries in seconds (default: 3600)",
++    )
+     parser.add_argument("--json", action="store_true", help="emit JSON lines instead of text")
+     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
+     return parser
+@@ -40,8 +48,16 @@ def build_parser() -> argparse.ArgumentParser:
+ 
+ def read_records(args: argparse.Namespace) -> list[Record]:
+     if args.path == "-":
++        if args.cache:
++            print("logslice: --cache is ignored when reading from stdin", file=sys.stderr)
+         return list(parse_lines(sys.stdin))
+-    return parse_file(args.path)
++    if not args.cache:
++        return parse_file(args.path)
++    records = cache.load(args.path, cache.CACHE_DIR, ttl=args.cache_ttl)
++    if records is None:
++        records = parse_file(args.path)
++        cache.store(args.path, records, cache.CACHE_DIR)
++    return records
+ 
+ 
+ def main(argv: list[str] | None = None) -> int:
+diff --git a/tests/test_cache.py b/tests/test_cache.py
+new file mode 100644
+index 0000000..2f6fac3
+--- /dev/null
++++ b/tests/test_cache.py
+@@ -0,0 +1,179 @@
++import json
++import os
++import time
++from datetime import datetime, timedelta
++
++import pytest
++
++from logslice import cache
++from logslice.parser import parse_file
++
++SAMPLE = """\
++2024-05-01T12:00:00Z INFO [http] GET /index.html 200
++2024-05-01T12:00:05Z ERROR [db] connection reset by peer
++"""
++
++
++def make_log(tmp_path, text=SAMPLE):
++    path = tmp_path / "app.log"
++    path.write_text(text)
++    return path
++
++
++def test_round_trip(tmp_path):
++    log = make_log(tmp_path)
++    records = parse_file(log)
++    entry = cache.store(log, records, directory=tmp_path / "cache")
++    assert entry.parent == tmp_path / "cache"
++    assert cache.load(log, directory=tmp_path / "cache") == records
++
++
++def test_miss_on_empty_cache(tmp_path):
++    log = make_log(tmp_path)
++    assert cache.load(log, directory=tmp_path / "cache") is None
++
++
++def test_key_changes_when_file_changes(tmp_path):
++    log = make_log(tmp_path)
++    before = cache.cache_key(log)
++    with open(log, "a") as handle:
++        handle.write("2024-05-01T12:00:09Z INFO [http] GET /about 200\n")
++    assert cache.cache_key(log) != before
++
++
++def test_modified_file_is_a_miss(tmp_path):
++    log = make_log(tmp_path)
++    cache.store(log, parse_file(log), directory=tmp_path / "cache")
++    with open(log, "a") as handle:
++        handle.write("2024-05-01T12:00:09Z INFO [http] GET /about 200\n")
++    assert cache.load(log, directory=tmp_path / "cache") is None
++
++
++def test_corrupt_entry_is_a_miss(tmp_path):
++    log = make_log(tmp_path)
++    entry = cache.store(log, parse_file(log), directory=tmp_path / "cache")
++    entry.write_text("{not json")
++    assert cache.load(log, directory=tmp_path / "cache") is None
++
++
++def test_entry_records_metadata(tmp_path):
++    log = make_log(tmp_path)
++    entry = cache.store(log, parse_file(log), directory=tmp_path / "cache")
++    data = json.loads(entry.read_text())
++    assert data["version"] == cache.FORMAT_VERSION
++    assert data["source"] == str(log.resolve())
++    assert isinstance(data["created_at"], float)
++
++
++def test_ttl_expires_old_entries(tmp_path, monkeypatch):
++    """Test that cache entries expire after TTL seconds."""
++    log = make_log(tmp_path)
++    records = parse_file(log)
++    # Store with explicit directory
++    entry = cache.store(log, records, directory=tmp_path / "cache")
++    
++    # Get the created_at timestamp
++    data = json.loads(entry.read_text())
++    created_at = data["created_at"]
++    
++    # Modify the entry to have an old created_at (more than TTL seconds ago)
++    old_created_at = created_at - 4000  # 4000 seconds ago, with default TTL of 3600
++    entry.write_text(json.dumps({
++        "version": cache.FORMAT_VERSION,
++        "source": str(log.resolve()),
++        "created_at": old_created_at,
++        "records": data["records"],
++    }))
++    
++    # Load should return None (cache miss) due to TTL
++    assert cache.load(log, directory=tmp_path / "cache", ttl=3600) is None
++
++
++def test_ttl_with_explicit_ttl(tmp_path, monkeypatch):
++    """Test that custom TTL works correctly."""
++    log = make_log(tmp_path)
++    records = parse_file(log)
++    entry = cache.store(log, records, directory=tmp_path / "cache")
++    
++    # Get the created_at timestamp
++    data = json.loads(entry.read_text())
++    created_at = data["created_at"]
++    
++    # Modify the entry to have an old created_at (more than TTL seconds ago)
++    old_created_at = created_at - 3700  # 3700 seconds ago
++    entry.write_text(json.dumps({
++        "version": cache.FORMAT_VERSION,
++        "source": str(log.resolve()),
++        "created_at": old_created_at,
++        "records": data["records"],
++    }))
++    
++    # With 300 second TTL, this should be a miss (3700 > 300)
++    assert cache.load(log, directory=tmp_path / "cache", ttl=300) is None
++    
++    # With 4000 second TTL, this should be a hit (3700 < 4000)
++    assert cache.load(log, directory=tmp_path / "cache", ttl=4000) == records
++
++
++def test_default_ttl(tmp_path, monkeypatch):
++    """Test that default TTL (3600) works."""
++    log = make_log(tmp_path)
++    records = parse_file(log)
++    entry = cache.store(log, records, directory=tmp_path / "cache")
++    
++    # Get the created_at timestamp
++    data = json.loads(entry.read_text())
++    created_at = data["created_at"]
++    
++    # Modify the entry to have an old created_at (more than 3600 seconds ago)
++    old_created_at = created_at - 4000  # 4000 seconds ago
++    entry.write_text(json.dumps({
++        "version": cache.FORMAT_VERSION,
++        "source": str(log.resolve()),
++        "created_at": old_created_at,
++        "records": data["records"],
++    }))
++    
++    # Should be a miss with default TTL (3600)
++    assert cache.load(log, directory=tmp_path / "cache") is None
++
++
++def test_custom_cache_dir_from_env(tmp_path, monkeypatch):
++    """Test that LOGSLICE_CACHE_DIR environment variable is used."""
++    custom_dir = tmp_path / "custom_cache"
++    monkeypatch.setenv("LOGSLICE_CACHE_DIR", str(custom_dir))
++    
++    log = make_log(tmp_path)
++    records = parse_file(log)
++    entry = cache.store(log, records)
++    
++    # Should use the custom directory
++    assert entry.parent == custom_dir
++    assert not (tmp_path / "cache").exists()
++
++
++def test_xdg_cache_dir_from_env(tmp_path, monkeypatch):
++    """Test that XDG_CACHE_HOME environment variable is used."""
++    xdg_dir = tmp_path / "xdg_cache"
++    monkeypatch.setenv("XDG_CACHE_HOME", str(xdg_dir))
++    
++    log = make_log(tmp_path)
++    records = parse_file(log)
++    entry = cache.store(log, records)
++    
++    # Should use XDG_CACHE_HOME/logslice
++    assert entry.parent == xdg_dir / "logslice"
++    assert not (tmp_path / "cache").exists()
++
++
++def test_explicit_dir_overrides_env(tmp_path, monkeypatch):
++    """Test that explicit directory argument overrides environment variables."""
++    custom_dir = tmp_path / "explicit_cache"
++    monkeypatch.setenv("LOGSLICE_CACHE_DIR", str(tmp_path / "env_cache"))
++    
++    log = make_log(tmp_path)
++    records = parse_file(log)
++    entry = cache.store(log, records, directory=custom_dir)
++    
++    # Should use the explicit directory
++    assert entry.parent == custom_dir
+diff --git a/tests/test_cli.py b/tests/test_cli.py
+index 53201f5..1e8f7fd 100644
+--- a/tests/test_cli.py
++++ b/tests/test_cli.py
+@@ -1,7 +1,10 @@
+ import json
++import sys
++import time
+ 
+ import pytest
+ 
++from logslice import cache
+ from logslice.cli import main
+ 
+ SAMPLE = """\
+@@ -53,3 +56,51 @@ def test_count_by_json(log_file, capsys):
+ def test_missing_file_exit_code(tmp_path, capsys):
+     assert main([str(tmp_path / "nope.log")]) == 2
+     assert "nope.log" in capsys.readouterr().err
++
++
++def test_cache_flag_reuses_parsed_records(log_file, tmp_path, monkeypatch, capsys):
++    monkeypatch.setattr(cache, "CACHE_DIR", tmp_path / "cache")
++    assert main([str(log_file), "--cache", "--count-by", "level"]) == 0
++    first = capsys.readouterr().out
++    assert len(list((tmp_path / "cache").glob("*.json"))) == 1
++
++    def fail(path):
++        raise AssertionError("parse_file should not be called on a cache hit")
++
++    monkeypatch.setattr("logslice.cli.parse_file", fail)
++    assert main([str(log_file), "--cache", "--count-by", "level"]) == 0
++    assert capsys.readouterr().out == first
++
++
++def test_no_cache_without_flag(log_file, tmp_path, monkeypatch):
++    monkeypatch.setattr(cache, "CACHE_DIR", tmp_path / "cache")
++    main([str(log_file)])
++    assert not (tmp_path / "cache").exists()
++
++
++def test_cache_ttl_option(log_file, capsys):
++    """Test that --cache-ttl option is accepted and used."""
++    # Verify the CLI accepts the option by checking the parser
++    from logslice.cli import build_parser
++    parser = build_parser()
++    # Check that the parser has the --cache-ttl argument
++    actions = parser._actions
++    assert any(action.option_strings == ["--cache-ttl"] for action in actions)
++
++
++def test_cache_ttl_with_cache_flag(log_file, tmp_path, monkeypatch, capsys):
++    """Test that --cache-ttl works with --cache."""
++    monkeypatch.setattr(cache, "CACHE_DIR", tmp_path / "cache")
++    
++    # First run - cache miss, parse and store
++    assert main([str(log_file), "--cache", "--cache-ttl", "3600", "--count-by", "level"]) == 0
++    first_output = capsys.readouterr().out
++    assert len(list((tmp_path / "cache").glob("*.json"))) == 1
++    
++    # Second run - cache hit (with default TTL)
++    def fail(path):
++        raise AssertionError("parse_file should not be called on a cache hit")
++    
++    monkeypatch.setattr("logslice.cli.parse_file", fail)
++    assert main([str(log_file), "--cache", "--cache-ttl", "3600", "--count-by", "level"]) == 0
++    assert capsys.readouterr().out == first_output

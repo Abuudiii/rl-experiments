@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "logslice"
+version = "0.3.0"
+description = "Filter and summarise structured log files from the command line"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+
+[project.scripts]
+logslice = "logslice.cli:main"
+
+[tool.setuptools]
+packages = ["logslice"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

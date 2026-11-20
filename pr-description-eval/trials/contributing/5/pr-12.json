@@ -1,0 +1,138 @@
+{
+  "number": 12,
+  "title": "Add --cache flag to reuse parsed results",
+  "body": "## Summary\n\nParsing is the slow part of `logslice` on big files (the 1.2 GB ingest log from the nightly job takes ~40 s just to parse). This PR adds an opt-in on-disk cache of parsed records, so repeated queries against the same file skip parsing entirely.\n\n## Changes\n\n- New `--cache` flag. When set, parsed records are loaded from the cache if present; otherwise the file is parsed and the result is saved for next time.\n- New module `logslice/cache.py` with `load()` / `store()` / `cache_key()`.\n- Cache entries are stored as JSON, one file per log file. The cache directory is resolved when it is needed (not at import time), in this order: `$LOGSLICE_CACHE_DIR` if set and non-empty (used as-is), otherwise `$XDG_CACHE_HOME/logslice`, otherwise `~/.cache/logslice`. An explicit `directory=` argument to `load()`/`store()` wins over all of these.\n- The cache key is computed by `cache_key()` from the file's resolved path, size and mtime, so editing or appending to a log automatically invalidates its entry.\n- Cache entries expire after a configurable TTL, so the cache does not grow without bound and a rotated file rewritten in place (same size and mtime) is not served stale forever. `--cache-ttl SECONDS` sets the TTL (integer, default 3600); `load()` takes a `ttl` keyword argument (default 3600) and treats an entry whose `created_at` is more than `ttl` seconds old as a miss, which the CLI re-parses and overwrites.\n- `--cache` is ignored (with a warning) when reading from stdin.\n- README: the \"Caching\" section documents the directory resolution order and the TTL.\n\n## Testing\n\n- `pytest`: `tests/test_cache.py` covers the store/load round trip, key changes on modification, corrupt entries, TTL expiry (including the exact boundary), and cache-directory resolution from `$LOGSLICE_CACHE_DIR` / `$XDG_CACHE_HOME` / the default; `tests/test_cli.py` covers the `--cache` hit path, `--cache-ttl` parsing and expiry, and that nothing is written without the flag.\n- Manually: `logslice --cache --count-by level ingest.log` twice; the second run went from 41 s to 0.4 s.\n",
+  "state": "OPEN",
+  "isDraft": false,
+  "author": {
+    "login": "mkowalski"
+  },
+  "baseRefName": "main",
+  "headRefName": "feature/result-cache",
+  "url": "https://github.com/acme/logslice/pull/12",
+  "createdAt": "2024-05-06T11:55:00Z",
+  "updatedAt": "2026-11-20T04:37:51Z",
+  "labels": [
+    {
+      "name": "enhancement"
+    }
+  ],
+  "assignees": [],
+  "reviewRequests": [],
+  "reviewDecision": "CHANGES_REQUESTED",
+  "reviews": [
+    {
+      "id": 2001,
+      "author": {
+        "login": "priya-r"
+      },
+      "authorAssociation": "MEMBER",
+      "state": "CHANGES_REQUESTED",
+      "body": "Thanks Marta, this will help a lot with the big ingest logs. Requesting changes for three things (details in the inline comments):\n\n1. Make the cache directory configurable instead of hard-coding `~/.cache/logslice`.\n2. Cache entries need to expire.\n3. Small naming nit on `_key`.",
+      "submittedAt": "2024-05-07T09:31:00Z"
+    }
+  ],
+  "comments": [
+    {
+      "id": 3001,
+      "author": {
+        "login": "dvolkov"
+      },
+      "authorAssociation": "MEMBER",
+      "body": "Nice, I've been wanting this for the ingest logs. No strong opinions on the details, I'll leave the review to Priya.",
+      "createdAt": "2024-05-06T14:02:00Z"
+    }
+  ],
+  "review_comments": [
+    {
+      "id": 4001,
+      "pull_request_review_id": 2001,
+      "user": {
+        "login": "priya-r"
+      },
+      "path": "logslice/cache.py",
+      "line": 17,
+      "side": "RIGHT",
+      "commit_id": null,
+      "diff_hunk": "@@ -0,0 +1,17 @@\n+...\n+CACHE_DIR = Path.home() / \".cache\" / \"logslice\"",
+      "body": "We can't hard-code `~/.cache/logslice`: CI runners and some of our hosts have a read-only home, and it ignores the XDG spec. Please resolve the directory when it's needed (not at import time), in this order:\n\n1. `$LOGSLICE_CACHE_DIR`, if set and non-empty, used as-is (no `logslice` subdirectory appended);\n2. otherwise `$XDG_CACHE_HOME/logslice`, if `XDG_CACHE_HOME` is set and non-empty;\n3. otherwise `~/.cache/logslice`.\n\nAn explicit `directory=` argument to `load()`/`store()` should still win over all of these. Please also fix the `--cache` help text, which hard-codes the path.",
+      "created_at": "2024-05-07T09:31:00Z",
+      "in_reply_to_id": null
+    },
+    {
+      "id": 4002,
+      "pull_request_review_id": 2001,
+      "user": {
+        "login": "priya-r"
+      },
+      "path": "logslice/cache.py",
+      "line": 34,
+      "side": "RIGHT",
+      "commit_id": null,
+      "diff_hunk": "@@ -0,0 +1,34 @@\n+...\n+    Entries never expire: the key changes whenever the file is modified, so a",
+      "body": "I don't think \"never expire\" is OK. The cache grows without bound, and our log shipper sometimes rewrites rotated files in place with the same size and mtime, so people would get stale results indefinitely. Please add a TTL:\n\n- a new CLI option `--cache-ttl SECONDS` (integer, default 3600), used together with `--cache`;\n- `load()` takes a `ttl` keyword argument (seconds, default 3600) and treats an entry whose `created_at` is more than `ttl` seconds old as a miss;\n- on a miss the CLI re-parses the file and overwrites the entry, as it already does.\n\nPlease add tests for the expiry.",
+      "created_at": "2024-05-07T09:31:00Z",
+      "in_reply_to_id": null
+    },
+    {
+      "id": 4003,
+      "pull_request_review_id": 2001,
+      "user": {
+        "login": "priya-r"
+      },
+      "path": "logslice/cache.py",
+      "line": 21,
+      "side": "RIGHT",
+      "commit_id": null,
+      "diff_hunk": "@@ -0,0 +1,21 @@\n+...\n+def _key(path: Path) -> str:",
+      "body": "nit: `_key` is a bit cryptic, and I'd like to reuse it for a `logslice cache` subcommand later. Please rename it to `cache_key` (public, no underscore) and give it a docstring saying what goes into the key (resolved path, size and mtime).",
+      "created_at": "2024-05-07T09:31:00Z",
+      "in_reply_to_id": null
+    },
+    {
+      "id": 4004,
+      "pull_request_review_id": null,
+      "user": {
+        "login": "mkowalski"
+      },
+      "path": "logslice/cache.py",
+      "line": 17,
+      "side": "RIGHT",
+      "commit_id": null,
+      "diff_hunk": "@@ -0,0 +1,17 @@\n+...\n+CACHE_DIR = Path.home() / \".cache\" / \"logslice\"",
+      "body": "Done. The directory is now resolved at call time in `_default_cache_dir()` (no import-time constant): `$LOGSLICE_CACHE_DIR` if set and non-empty (used as-is), otherwise `$XDG_CACHE_HOME/logslice`, otherwise `~/.cache/logslice`. An explicit `directory=` argument to `load()`/`store()` still wins over all of these. The `--cache` help text no longer hard-codes the path. Added tests covering each branch of the resolution order and the empty-var fallback.",
+      "created_at": "2026-11-20T04:37:51Z",
+      "in_reply_to_id": 4001
+    },
+    {
+      "id": 4005,
+      "pull_request_review_id": null,
+      "user": {
+        "login": "mkowalski"
+      },
+      "path": "logslice/cache.py",
+      "line": 34,
+      "side": "RIGHT",
+      "commit_id": null,
+      "diff_hunk": "@@ -0,0 +1,34 @@\n+...\n+    Entries never expire: the key changes whenever the file is modified, so a",
+      "body": "Added a TTL. New CLI option `--cache-ttl SECONDS` (integer, default 3600) used together with `--cache`; `load()` takes a `ttl` keyword argument (default 3600) and treats an entry whose `created_at` is more than `ttl` seconds old as a miss, so the CLI re-parses and overwrites the entry. Added tests for expiry, including the exact boundary (age == ttl is still a hit, age > ttl is a miss).",
+      "created_at": "2026-11-20T04:37:51Z",
+      "in_reply_to_id": 4002
+    },
+    {
+      "id": 4006,
+      "pull_request_review_id": null,
+      "user": {
+        "login": "mkowalski"
+      },
+      "path": "logslice/cache.py",
+      "line": 21,
+      "side": "RIGHT",
+      "commit_id": null,
+      "diff_hunk": "@@ -0,0 +1,21 @@\n+...\n+def _key(path: Path) -> str:",
+      "body": "Renamed `_key` to the public `cache_key` with a docstring noting it hashes the file's resolved path, size and mtime. Ready to reuse for a `logslice cache` subcommand later.",
+      "created_at": "2026-11-20T04:37:51Z",
+      "in_reply_to_id": 4003
+    }
+  ]
+}

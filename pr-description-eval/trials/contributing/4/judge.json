@@ -1,0 +1,7 @@
+{
+  "desc_accurate": false,
+  "reason": "The description fails A: it says entries are stored under `~/.cache/logslice/`, that entries never expire and need no TTL, and it names `_key()` as the helper, all of which the final diff contradicts. It also fails B: it omits the `LOGSLICE_CACHE_DIR`/XDG configuration and the `--cache-ttl` flag that the review-driven changes added.",
+  "model": "claude-haiku-5-5",
+  "cost_usd": 0.0018109300000000003,
+  "attempts": 1
+}

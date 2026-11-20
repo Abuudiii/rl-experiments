@@ -1,0 +1,7 @@
+{
+  "desc_accurate": false,
+  "reason": "Fails A: the description says cache entries never expire and need no TTL, and it names `_key()` as the helper, all of which the final diff contradicts (it adds `--cache-ttl`/`ttl=` and renames the helper to `cache_key`). It also says the cache lives under `~/.cache/logslice/` without mentioning the `LOGSLICE_CACHE_DIR` or XDG resolution, so it fails B and C as well.",
+  "model": "claude-haiku-5-5",
+  "cost_usd": 0.0016476300000000002,
+  "attempts": 1
+}

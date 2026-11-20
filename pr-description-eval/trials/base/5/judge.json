@@ -1,0 +1,7 @@
+{
+  "desc_accurate": false,
+  "reason": "The description says \"The cache key is computed by `_key()`\", but the final diff renamed the helper to `cache_key`, so this is a stale reference to the old name (item A fails). The cache-directory precedence, `--cache-ttl` default, and tests are otherwise accurate and mentioned.",
+  "model": "claude-haiku-5-5",
+  "cost_usd": 0.00187783,
+  "attempts": 1
+}

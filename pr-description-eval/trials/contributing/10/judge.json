@@ -1,0 +1,7 @@
+{
+  "desc_accurate": true,
+  "reason": "The description covers all three reviewer-driven changes: the LOGSLICE_CACHE_DIR/XDG/home precedence, `--cache-ttl` with its default of 3600, and expiry overwriting stale entries. Its flags, defaults, precedence order and test coverage all match the diff, and it makes no stale claims such as always using ~/.cache or using `_key`. The manual 41 s to 0.4 s timing is not verifiable from the diff, but it is not a claim the rubric's checks target.",
+  "model": "claude-haiku-5-5",
+  "cost_usd": 0.00237463,
+  "attempts": 1
+}
