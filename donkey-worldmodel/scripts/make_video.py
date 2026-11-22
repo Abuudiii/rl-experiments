@@ -3,7 +3,8 @@
   python scripts/make_video.py RECORD_DIR OUT.mp4 [--title TEXT]
 
 Four panels: pilot camera (with the 64x64 image the agent actually receives inset), chase camera,
-top-down map with the car's path, and telemetry. Needs ffmpeg on PATH.
+hawkeye camera (frames from scripts/replay_overhead.py) and a map of the car's path with telemetry.
+Needs ffmpeg on PATH.
 """
 import argparse
 import json
@@ -47,12 +48,13 @@ if track:
 points = track + list(zip(xs, zs))
 lo_x, hi_x = min(p[0] for p in points), max(p[0] for p in points)
 lo_z, hi_z = min(p[1] for p in points), max(p[1] for p in points)
-zoom = min((W - 60) / (hi_x - lo_x), (H - 80) / (hi_z - lo_z))
+MAP_W, MAP_H = 210, 290   # map area inside the last panel
+zoom = min(MAP_W / (hi_x - lo_x), MAP_H / (hi_z - lo_z))
 
 
 def to_map(x, z):
-  px = W / 2 + (x - (lo_x + hi_x) / 2) * zoom
-  py = H / 2 + 14 - (z - (lo_z + hi_z) / 2) * zoom
+  px = 14 + MAP_W / 2 + (x - (lo_x + hi_x) / 2) * zoom
+  py = 40 + MAP_H / 2 - (z - (lo_z + hi_z) / 2) * zoom
   return px, py
 
 
@@ -62,13 +64,13 @@ def label(draw, text):
 
 
 def bar(draw, y, name, value, lo, hi, text):
-  draw.text((24, y), name, font=MEDIUM, fill=DIM)
-  x0, x1 = 130, W - 90
-  draw.rectangle([x0, y + 3, x1, y + 17], outline=DIM)
+  x0, x1 = 250, W - 62
+  draw.text((x0, y), name, font=SMALL, fill=DIM)
+  draw.text((x1 + 8, y + 15), text, font=SMALL, fill=FG)
+  draw.rectangle([x0, y + 18, x1, y + 30], outline=DIM)
   zero = x0 + (0 - lo) / (hi - lo) * (x1 - x0)
   pos = x0 + (min(max(value, lo), hi) - lo) / (hi - lo) * (x1 - x0)
-  draw.rectangle([min(zero, pos), y + 4, max(zero, pos), y + 16], fill=ACCENT)
-  draw.text((x1 + 10, y), text, font=MEDIUM, fill=FG)
+  draw.rectangle([min(zero, pos), y + 19, max(zero, pos), y + 29], fill=ACCENT)
 
 
 ffmpeg = subprocess.Popen([
@@ -93,30 +95,28 @@ for index, row in enumerate(rows):
   label(ImageDraw.Draw(panel), 'CHASE')
   canvas.paste(panel, (W, 0))
 
+  overhead = args.record / f"overhead_{row['frame']}.jpg"
+  if overhead.exists():
+    panel = Image.open(overhead).convert('RGB').resize((W, H), Image.LANCZOS)
+    label(ImageDraw.Draw(panel), 'HAWKEYE  (camera above the car, looking straight down)')
+    canvas.paste(panel, (0, H))
+
   panel = Image.new('RGB', (W, H), BG)
   draw = ImageDraw.Draw(panel)
-  label(draw, 'TOP-DOWN MAP  (track centre line and the car\'s path)')
+  label(draw, 'MAP AND TELEMETRY  ' + args.title)
   if track:
-    draw.line([to_map(*p) for p in track + track[:1]], fill=(90, 90, 100), width=9)
+    draw.line([to_map(*p) for p in track + track[:1]], fill=(90, 90, 100), width=7)
   trail.append(to_map(row['x'], row['z']))
   if len(trail) > 1:
     draw.line(trail, fill=TRAIL, width=2)
   x, y = trail[-1]
-  draw.ellipse([x - 6, y - 6, x + 6, y + 6], fill=ACCENT, outline=FG)
-  canvas.paste(panel, (0, H))
-
-  panel = Image.new('RGB', (W, H), BG)
-  draw = ImageDraw.Draw(panel)
-  label(draw, 'TELEMETRY')
-  draw.text((24, 40), args.title, font=MEDIUM, fill=FG)
-  draw.text((24, 64), 'policy trained inside a learned world model, camera only', font=SMALL, fill=DIM)
-  draw.text((24, 100), f"lap {min(int(row['laps']) + 1, max(1, round(rows[-1]['laps'])))}", font=BIG, fill=FG)
-  draw.text((200, 100), f"{index / HZ:5.1f} s", font=BIG, fill=FG)
-  draw.text((24, 140), f"{row['laps']:.2f} laps driven", font=MEDIUM, fill=DIM)
-  bar(draw, 190, 'steering', row['steer'], -1, 1, f"{row['steer']:+.2f}")
-  bar(draw, 225, 'throttle', row['throttle'], 0, 1, f"{row['throttle']:.2f}")
-  bar(draw, 260, 'speed', row['speed'], 0, 5, f"{row['speed']:.1f}")
-  bar(draw, 295, 'off centre', row['cte'], -3, 3, f"{row['cte']:+.1f}")
+  draw.ellipse([x - 5, y - 5, x + 5, y + 5], fill=ACCENT, outline=FG)
+  draw.text((250, 40), f"lap {min(int(row['laps']) + 1, max(1, round(rows[-1]['laps'])))}", font=BIG, fill=FG)
+  draw.text((250, 78), f"{index / HZ:5.1f} s   {row['laps']:.2f} laps", font=MEDIUM, fill=DIM)
+  bar(draw, 125, 'steering', row['steer'], -1, 1, f"{row['steer']:+.2f}")
+  bar(draw, 175, 'throttle', row['throttle'], 0, 1, f"{row['throttle']:.2f}")
+  bar(draw, 225, 'speed', row['speed'], 0, 5, f"{row['speed']:.1f}")
+  bar(draw, 275, 'off centre', row['cte'], -3, 3, f"{row['cte']:+.1f}")
   canvas.paste(panel, (W, H))
 
   ffmpeg.stdin.write(canvas.tobytes())

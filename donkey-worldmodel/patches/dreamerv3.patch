@@ -1,5 +1,22 @@
+diff --git i/dreamerv3/agent.py w/dreamerv3/agent.py
+index 0cada34..f969bb0 100644
+--- i/dreamerv3/agent.py
++++ w/dreamerv3/agent.py
+@@ -123,7 +123,11 @@ class Agent(embodied.jax.Agent):
+     if dec_carry:
+       dec_carry, dec_entry, recons = self.dec(dec_carry, feat, reset, **kw)
+     policy = self.pol(self.feat2tensor(feat), bdims=1)
+-    act = sample(policy)
++    if mode == 'eval':
++      # Evaluate with the policy's mean action; sampling adds noise to every control command.
++      act = jax.tree.map(lambda x: x.pred(), policy)
++    else:
++      act = sample(policy)
+     out = {}
+     out['finite'] = elements.tree.flatdict(jax.tree.map(
+         lambda x: jnp.isfinite(x).all(range(1, x.ndim)),
 diff --git i/dreamerv3/configs.yaml w/dreamerv3/configs.yaml
-index 786b67e..2e7198b 100644
+index 786b67e..6d5da11 100644
 --- i/dreamerv3/configs.yaml
 +++ w/dreamerv3/configs.yaml
 @@ -35,6 +35,8 @@ defaults:
@@ -7,7 +24,7 @@ index 786b67e..2e7198b 100644
      dmc: {size: [64, 64], repeat: 1, proprio: True, image: True, camera: -1}
      loconav: {size: [64, 64], repeat: 1, camera: -1}
 +    # Every sim also tries to bind its private API on 9092, and the nodes run services on 9100-9110.
-+    donkey: {size: [64, 64], length: 2000, max_laps: 0, port_base: 9200, host: '127.0.0.1', max_cte: 3.0, throttle_min: 0.2, throttle_max: 0.6, stall_steps: 200, reload_seconds: 0, record: ''}
++    donkey: {size: [64, 64], length: 2000, max_laps: 0, port_base: 9200, host: '127.0.0.1', max_cte: 3.0, throttle_min: 0.2, throttle_max: 0.6, stall_steps: 200, reload_seconds: 0, record: '', steer_rate: 0.2, smooth_cost: 0.5, steer_smooth: 0.3}
  
    replay:
      size: 5e6
@@ -28,16 +45,18 @@ index 786b67e..2e7198b 100644
  
    agent:
      loss_scales: {rec: 1.0, rew: 1.0, con: 1.0, dyn: 1.0, rep: 0.1, policy: 1.0, value: 1.0, repval: 0.3}
-@@ -186,6 +191,15 @@ dmc_vision:
+@@ -186,6 +191,17 @@ dmc_vision:
    env.dmc.proprio: False
    run: {steps: 1.1e6, train_ratio: 256}
  
 +donkey:
 +  task: donkey_generated-track
-+  run: {steps: 3e5, envs: 8, train_ratio: 64, debug: False, log_every: 60, report_every: 600, save_every: 300}
++  run: {steps: 3e5, envs: 6, train_ratio: 64, debug: False, log_every: 60, report_every: 600, save_every: 300}
 +  run.usage.nvsmi: False
-+  # Each car reloads its scene every 3 minutes, so training sees many tree, cone and lighting variants.
-+  env.donkey.reload_seconds: 180
++  # Training only: each car reloads its scene every 90 s (new trees and lighting), and the episode ends
++  # 2.5 from the centre line. Evaluate with --env.donkey.max_cte 3.0 --env.donkey.reload_seconds 0.
++  env.donkey.reload_seconds: 90
++  env.donkey.max_cte: 2.5
 +  jax: {platform: rocm, prealloc: False}
 +  replay.size: 1e6
 +

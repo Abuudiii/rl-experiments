@@ -13,7 +13,7 @@ class Donkey(embodied.Env):
       self, task, index=0, size=(64, 64), length=2000, max_laps=0,
       port_base=9200, host='127.0.0.1', max_cte=4.0,
       throttle_min=0.2, throttle_max=0.6, stall_steps=200, reload_seconds=0,
-      record=''):
+      record='', steer_rate=0.0, smooth_cost=0.0, steer_smooth=0.0):
     self._id = f'donkey-{task}-v0'
     self._conf = dict(
         host=host, port=int(port_base) + int(index), max_cte=float(max_cte),
@@ -26,6 +26,13 @@ class Donkey(embodied.Env):
     self._max_cte = float(max_cte)
     self._reload_seconds = float(reload_seconds)
     self._loaded_at = None
+    self._steer_rate = float(steer_rate)     # largest steering change per step; 0 = unlimited
+    self._smooth_cost = float(smooth_cost)   # reward lost per unit the wheel actually moves in a step
+    # Low-pass on steering: each step the wheel covers this fraction of the gap to the request; 0 = off.
+    self._steer_smooth = float(steer_smooth)
+    self._last_step = 0.0                    # previous step's steering movement, to count reversals
+    self._steer = 0.0                        # steering currently applied to the car
+    self._asked = 0.0                        # steering the policy asked for on the previous step
     self._record = record     # folder for demo-video material, or '' for none
     self._recorder = None
     self._action = np.zeros(2, np.float32)
@@ -52,6 +59,9 @@ class Donkey(embodied.Env):
         'log/hit': elements.Space(np.float32),
         'log/speed': elements.Space(np.float32),
         'log/dt': elements.Space(np.float32),
+        'log/steer_change': elements.Space(np.float32),
+        'log/steer_flip': elements.Space(np.float32),
+        'log/start_speed': elements.Space(np.float32),
     }
 
   @property
@@ -121,9 +131,25 @@ class Donkey(embodied.Env):
       self._best = 0.0
       self._best_step = 0
       self._node = self._handler.active_node
+      self._steer = 0.0
+      self._asked = 0.0
+      self._last_step = 0.0
       self._time = time.time()
       return self._obs(frame, 0.0, info, 0.0, is_first=True)
-    self._action = np.asarray(action['action'], np.float32)
+    asked = np.asarray(action['action'], np.float32)
+    self._asked = float(asked[0])
+    # The wheel cannot jump: move the applied steering towards the request by at most steer_rate.
+    step = float(asked[0]) - self._steer
+    if self._steer_smooth:
+      step *= self._steer_smooth
+    if self._steer_rate:
+      step = float(np.clip(step, -self._steer_rate, self._steer_rate))
+    self._steer_change = abs(step)
+    # A reversal: the wheel was moving one way and now moves the other (ignoring tiny movements).
+    self._steer_flip = float(step * self._last_step < 0 and abs(step) > 0.02 and abs(self._last_step) > 0.02)
+    self._last_step = step
+    self._steer = float(self._steer + step)
+    self._action = np.array([self._steer, asked[1]], np.float32)
     frame, _, over, _, info = self._env.step(self._action)
     total = self._handler.total_nodes
     delta = (self._handler.active_node - self._node) % total
@@ -134,7 +160,9 @@ class Donkey(embodied.Env):
     self._steps += 1
     if self._progress > self._best:
       self._best, self._best_step = self._progress, self._steps
-    reward = 100.0 * delta / total        # one full lap = +100
+    # One full lap = +100; moving the wheel costs a little. The cost is on the applied steering, after the
+    # filter: training samples noisy requests, and a cost on those would mostly punish the noise.
+    reward = 100.0 * delta / total - self._smooth_cost * self._steer_change
     laps = self._progress / total
     terminal = bool(over)                 # left the track or hit something
     if terminal:
@@ -169,11 +197,18 @@ class Donkey(embodied.Env):
         'log/hit': np.float32(info['hit'] != 'none'),   # 1 when the sim reports a collision
         'log/speed': np.float32(info['speed']),
         'log/dt': np.float32(dt),
+        # How far the applied steering moved this step; its episode average measures smoothness.
+        'log/steer_change': np.float32(0.0 if is_first else self._steer_change),
+        # 1 on steps where the wheel reverses direction; episode average x 20 = reversals per second.
+        'log/steer_flip': np.float32(0.0 if is_first else self._steer_flip),
+        # Speed on the first step of the episode; should be 0 if the reset really stopped the car.
+        'log/start_speed': np.float32(info['speed'] if is_first else 0.0),
     }
     if self._recorder:
       self._recorder.write(dict(
-          x=info['pos'][0], z=info['pos'][2], cte=info['cte'], speed=info['speed'],
-          steer=float(self._action[0]), throttle=float(self._action[1]), laps=float(laps),
+          x=info['pos'][0], y=info['pos'][1], z=info['pos'][2], yaw=info['car'][2],
+          cte=info['cte'], speed=info['speed'],
+          steer=float(self._action[0]), asked=self._asked, throttle=float(self._action[1]), laps=float(laps),
           sim_laps=info['lap_count'], first=is_first, last=is_last, terminal=is_terminal))
     return obs
 

@@ -6,15 +6,55 @@ Run on 2026-11-21 on one MI350X (`asrock-1w300-f1-1`), JAX 0.12 on ROCm, simulat
 
 ![demo](figures/demo.gif)
 
-The run 2 agent on a simulator started after training (first 12 s of a 5-lap drive). Top: the car's camera,
-with the 64x64 image the agent actually receives inset, and a chase camera. Bottom: the track centre line with
-the car's path, and the agent's steering and throttle.
+The run 4 agent on a simulator started after training (10 s of a 5-lap drive). Top: the car's camera, with
+the 64x64 image the agent actually receives inset, and a chase camera. Bottom: a camera above the car
+(filmed afterwards by putting a car back at each recorded position in the same scene), and the track centre
+line with the car's path, steering and throttle.
 
 ![dream](figures/dream.gif)
 
 The world model, 64x64. Each column is one stretch of driving: real frames, the model's prediction, and the
 difference. The model sees the first half and imagines the second half from the actions alone; it keeps the
 road shape and loses detail in the trees.
+
+## Result: run 4 (`donkey_p3`, seed 0, 300k steps, 6 cars, about 52 minutes of wall time)
+
+The run made to drive smoothly. Changes from run 2:
+- steering goes through a low-pass filter (each step the wheel covers 30% of the gap to the request) and can
+  move at most 0.2 per step;
+- moving the wheel costs reward (0.5 per unit of applied movement);
+- evaluation uses the policy's mean action (DreamerV3 samples even in its eval mode; patched);
+- training ends an episode 2.5 from the centre line, evaluation at 3.0, so the learned line keeps a margin;
+- the simulator's random on-road cones are off (they are pass-through triggers, and earlier agents drove
+  through them), scenes reload every 90 s, and 6 cars.
+
+| | Steps | Minutes of driving (6 cars summed) |
+|---|---|---|
+| First episode with a full lap | 28,659 | 23.9 |
+| First episode with 5 laps | 50,679 | 42.2 |
+| First episode with 10 laps | 283,568 | 236.3 |
+
+- **Evaluation on four simulators started after training: 12 of 12 episodes completed 10 consecutive laps**,
+  no collisions, never more than 2.31 from the centre line (limit 3.0). A lap takes about 188 steps (9.4 s).
+- Steering on a recorded 5-lap drive, each agent with its own evaluation settings:
+
+| | Mean wheel movement per step | Largest step | Direction reversals per second |
+|---|---|---|---|
+| Run 2 (sampled actions, no limits) | 0.618 | 2.00 | 6.3 |
+| Run 3 (rate limit, weak cost) | 0.116 | 0.20 | 6.6 |
+| Run 4 | 0.069 | 0.20 | 3.1 |
+
+  Run 4 steers in ramps into and out of corners. The remaining reversals are ripples of about 0.03-0.05.
+- Training episodes are again less consistent than evaluation (sampled actions, and a 2.5 limit).
+
+![curve](figures/curve_run4.png)
+
+## Result: run 3 (`donkey_p2`, seed 0, 300k steps, 6 cars)
+
+Rate limit of 0.2 per step and a cost of 0.1 on the requested steering change, no filter. Not smooth (table
+above): the cost was too weak and mostly taxed the noise of sampled actions. On fresh simulators three scenes
+worked (8 of 9 episodes reached 10 laps) and one mostly failed (1 of 14), running 2.5-2.9 from the centre
+line against a limit of 3.0.
 
 ## Result: run 2 (`donkey_p1`, seed 0, 300k steps, 8 cars, about 46 minutes of wall time)
 
@@ -35,9 +75,7 @@ limit is `max_cte` 3.0 instead of 4.0, and 8 cars instead of 4.
   Not investigated. Two differences from evaluation: training runs 8 cars with step time averaging 0.065 s
   instead of 0.05 s, so some frames are dropped, and the learner ran at about 7,500 replayed steps/s against
   the 10,000 that 8 cars at train ratio 64 ask for.
-- Full outputs in `runs/report_p1/` (git-ignored). Laps per training episode against driving time:
-
-![curve](figures/curve_run2.png)
+- Full outputs in `runs/report_p1/` (git-ignored).
 
 ## Result: run 1 (`donkey_p0`, seed 0, 300k steps, 4 cars, about 68 minutes of wall time)
 
@@ -76,10 +114,10 @@ In those episodes a lap took about 166 steps (8.3 s) by our counter.
 
 ## Setup
 
-- Reward: +100 per lap of forward progress, -10 when the simulator ends the episode (more than `max_cte` from
-  the centre line, or a collision). Steering -1..1, throttle 0.2..0.6.
+- Reward: +100 per lap of forward progress, minus the steering cost, -10 when the simulator ends the episode
+  (more than `max_cte` from the centre line, or a collision). Steering -1..1, throttle 0.2..0.6.
 - Model `size12m`, train ratio 64, cars at 20 Hz, `--script parallel --run.actor_batch 1 --run.eval_envs 0`.
-  The `donkey` config block holds the run 2 settings (8 cars, `max_cte` 3.0, `reload_seconds` 180).
+  The `donkey` config block and `scripts/sims.sh` hold the run 4 settings.
 - DreamerV3 `e01491f` plus `patches/dreamerv3.patch`; gym-donkeycar `a1f4ca6`; simulator release `v25.10.06`.
 
 ## Reproduce
@@ -89,14 +127,14 @@ export LOGIN=a4 JOB=<slurm job> NODE_DIR=/home/AMD/absheikh/donkey-worldmodel
 bash scripts/sync_node.sh
 ssh a4 "srun --jobid=$JOB --overlap -n1 --chdir=$NODE_DIR bash scripts/setup_node.sh"
 bash ../fpv-racing/scripts/node_step.sh sims 124 <<'EOF'
-exec bash scripts/sims.sh 9200 8
+exec bash scripts/sims.sh 9200 6
 EOF
-bash ../fpv-racing/scripts/node_step.sh train_p1 124 <<'EOF'
+bash ../fpv-racing/scripts/node_step.sh train_p3 124 <<'EOF'
 export PYTHONUNBUFFERED=1 XLA_PYTHON_CLIENT_PREALLOCATE=false
 C=/tmp/absheikh_donkey/cache
 export JAX_COMPILATION_CACHE_DIR=$C/jax MIOPEN_USER_DB_PATH=$C/miopen MIOPEN_CUSTOM_CACHE_DIR=$C/miopen
 mkdir -p $C/jax $C/miopen && cd dreamerv3
-exec ../.venv/bin/python dreamerv3/main.py --logdir ../runs/donkey_p1 --configs donkey size12m --seed 0 \
+exec ../.venv/bin/python dreamerv3/main.py --logdir ../runs/donkey_p3 --configs donkey size12m --seed 0 \
   --script parallel --run.actor_batch 1 --run.eval_envs 0
 EOF
 ```
@@ -104,13 +142,15 @@ EOF
 The `parallel` script does not exit at `run.steps`; stop the step once `metrics.jsonl` passes the target.
 Evaluate on simulators restarted after training, with one `--script eval_only --run.envs 1 --run.debug True`
 process per simulator (`--env.donkey.port_base 920x --env.donkey.length 20000 --env.donkey.max_laps 10
---env.donkey.reload_seconds 0`), then
-`python scripts/report.py runs/donkey_p1 runs/report_p1 --eval runs/donkey_p1_eval*`.
+--env.donkey.reload_seconds 0 --env.donkey.max_cte 3.0`), then
+`python scripts/report.py runs/donkey_p3 runs/report_p3 --eval runs/donkey_p3_eval*`.
 
 Demo video: run one `eval_only` process with `--env.donkey.record <folder>` (saves both cameras at 320x240,
-telemetry and the track), copy the folder down, then `python scripts/make_video.py <folder> demo.mp4`.
-Two 320x240 cameras slow the simulator to about 6 steps/s of wall time; it still sends one frame per 0.05 s
-of simulated time, so the drive and the video are unaffected.
+telemetry, poses and the track), then `python scripts/replay_overhead.py --port <port> --record <folder>` on
+the same simulator before it is restarted (films the drive from above). Copy the folder down and run
+`python scripts/make_video.py <folder> demo.mp4`. Two 320x240 cameras slow the simulator to about 6 steps/s
+of wall time; it still sends one frame per 0.05 s of simulated time, so the drive and the video are
+unaffected.
 
 ## Things that had to be worked around
 
@@ -129,6 +169,8 @@ of simulated time, so the drive and the video are unaffected.
 - **Control delay.** The simulator renders about 10 frames per second and computes two 50 ms control steps per
   frame. Camera frames are distinct and 50 ms apart in simulated time, but about every other action takes
   effect one step late. Faster rendering would remove this.
-- **Run 1 against run 2 is not a controlled comparison.** Three things changed together (scene reloads,
-  `max_cte`, number of cars), so which one fixed the fresh-simulator failure is not known.
+- **The runs are not controlled comparisons.** Several things changed between each pair, so which change
+  fixed what is not known. In particular run 3's failing scene was not explained.
+- **Scenery cones remain.** Cones beside the road come from the same generator as the trees (never closer
+  than 5 units to the centre line); only the on-road cones are off.
 - One seed, one track, no baseline (PPO or imitation) yet.
