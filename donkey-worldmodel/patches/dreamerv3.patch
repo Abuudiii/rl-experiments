@@ -1,0 +1,135 @@
+diff --git i/dreamerv3/configs.yaml w/dreamerv3/configs.yaml
+index 786b67e..bda17f5 100644
+--- i/dreamerv3/configs.yaml
++++ w/dreamerv3/configs.yaml
+@@ -35,6 +35,8 @@ defaults:
+     minecraft: {size: [64, 64], break_speed: 100.0, logs: False, length: 36000}
+     dmc: {size: [64, 64], repeat: 1, proprio: True, image: True, camera: -1}
+     loconav: {size: [64, 64], repeat: 1, camera: -1}
++    # Every sim also tries to bind its private API on 9092, and the nodes run services on 9100-9110.
++    donkey: {size: [64, 64], length: 2000, max_laps: 0, port_base: 9200, host: '127.0.0.1', max_cte: 3.0, throttle_min: 0.2, throttle_max: 0.6, stall_steps: 200, reload_seconds: 0}
+ 
+   replay:
+     size: 5e6
+@@ -57,6 +59,7 @@ defaults:
+     eval_eps: 1
+     report_batches: 1
+     from_checkpoint: ''
++    from_checkpoint_regex: ''
+     episode_timeout: 180
+     actor_addr: 'localhost:{auto}'
+     replay_addr: 'localhost:{auto}'
+@@ -81,6 +84,8 @@ defaults:
+     expect_devices: 0
+     enable_policy: True
+     coordinator_address: ''
++    # The JAX profiler hangs ROCm runs (rocprofiler queue interposition) at update 100.
++    profiler: False
+ 
+   agent:
+     loss_scales: {rec: 1.0, rew: 1.0, con: 1.0, dyn: 1.0, rep: 0.1, policy: 1.0, value: 1.0, repval: 0.3}
+@@ -186,6 +191,15 @@ dmc_vision:
+   env.dmc.proprio: False
+   run: {steps: 1.1e6, train_ratio: 256}
+ 
++donkey:
++  task: donkey_generated-track
++  run: {steps: 3e5, envs: 8, train_ratio: 64, debug: False, log_every: 60, report_every: 600, save_every: 300}
++  run.usage.nvsmi: False
++  # Each car reloads its scene every 3 minutes, so training sees many tree, cone and lighting variants.
++  env.donkey.reload_seconds: 180
++  jax: {platform: rocm, prealloc: False}
++  replay.size: 1e6
++
+ bsuite:
+   task: bsuite_mnist/0
+   run: {envs: 1, save_every: -1, train_ratio: 1024}
+diff --git i/dreamerv3/main.py w/dreamerv3/main.py
+index 10476e8..e54c759 100644
+--- i/dreamerv3/main.py
++++ w/dreamerv3/main.py
+@@ -220,6 +220,7 @@ def make_env(config, index, **overrides):
+       'dm': 'embodied.envs.from_dmenv:FromDM',
+       'crafter': 'embodied.envs.crafter:Crafter',
+       'dmc': 'embodied.envs.dmc:DMC',
++      'donkey': 'embodied.envs.donkey:Donkey',
+       'atari': 'embodied.envs.atari:Atari',
+       'atari100k': 'embodied.envs.atari:Atari',
+       'dmlab': 'embodied.envs.dmlab:DMLab',
+@@ -238,6 +239,8 @@ def make_env(config, index, **overrides):
+     ctor = getattr(module, cls)
+   kwargs = config.env.get(suite, {})
+   kwargs.update(overrides)
++  if suite == 'donkey':
++    kwargs = {**kwargs, 'index': index}
+   if kwargs.pop('use_seed', False):
+     kwargs['seed'] = hash((config.seed, index)) % (2 ** 32 - 1)
+   if kwargs.pop('use_logdir', False):
+diff --git i/embodied/jax/agent.py w/embodied/jax/agent.py
+index ba90423..74b7893 100644
+--- i/embodied/jax/agent.py
++++ w/embodied/jax/agent.py
+@@ -172,13 +172,13 @@ class Agent(embodied.Agent):
+ 
+     self._split = jax.jit(
+         lambda xs: jax.tree.map(lambda x: list(x), xs),
+-        internal.local_sharding(self.policy_sharded),
+-        internal.local_sharding(self.policy_mirrored))
++        in_shardings=internal.local_sharding(self.policy_sharded),
++        out_shardings=internal.local_sharding(self.policy_mirrored))
+     self._stack = jax.jit(
+         lambda xs: jax.tree.map(
+             jnp.stack, xs, is_leaf=lambda x: isinstance(x, list)),
+-        internal.local_sharding(self.policy_mirrored),
+-        internal.local_sharding(self.policy_sharded))
++        in_shardings=internal.local_sharding(self.policy_mirrored),
++        out_shardings=internal.local_sharding(self.policy_sharded))
+ 
+     self._ckpt_groups = internal.grouped_ckpt_fns(
+         self.params, self.jaxcfg.ckpt_chunksize)
+diff --git i/embodied/jax/internal.py w/embodied/jax/internal.py
+index ae9047b..e886650 100644
+--- i/embodied/jax/internal.py
++++ w/embodied/jax/internal.py
+@@ -277,9 +277,13 @@ def ckpt_fn(params, compile=True):
+   keys = params.keys()
+   original = {k: params[k].sharding for k in keys}
+   inspec = {k: struct(params[k], original[k]) for k in keys}
+-  gather_fn = jax.jit(lambda x: x, (original,), mirrored).lower(inspec)
++  gather_fn = jax.jit(
++      lambda x: x, in_shardings=(original,),
++      out_shardings=mirrored).lower(inspec)
+   inspec = {k: struct(params[k], mirrored) for k in keys}
+-  shard_fn = jax.jit(lambda x: x, (mirrored,), original).lower(inspec)
++  shard_fn = jax.jit(
++      lambda x: x, in_shardings=(mirrored,),
++      out_shardings=original).lower(inspec)
+   if compile:
+     gather_fn = gather_fn.compile()
+     shard_fn = shard_fn.compile()
+diff --git i/embodied/jax/transform.py w/embodied/jax/transform.py
+index bc1b27e..986b694 100644
+--- i/embodied/jax/transform.py
++++ w/embodied/jax/transform.py
+@@ -53,7 +53,9 @@ def init(
+   if print_partition:
+     print_grouping(grouping)
+ 
+-  fn = jax.jit(fn, arg_shardings, params_sharding, static_argnums, None)
++  fn = jax.jit(
++      fn, in_shardings=arg_shardings, out_shardings=params_sharding,
++      static_argnums=static_argnums)
+   params = fn(*dummy_inputs)
+ 
+   return params, params_sharding
+@@ -129,7 +131,9 @@ def apply(
+         nn.LAYER_CALLBACK = old
+       return outs
+ 
+-  fn = jax.jit(fn, in_shardings, out_shardings, static_argnums, None, donate)
++  fn = jax.jit(
++      fn, in_shardings=in_shardings, out_shardings=out_shardings,
++      static_argnums=static_argnums, donate_argnums=donate)
+ 
+   return fn
+ 
