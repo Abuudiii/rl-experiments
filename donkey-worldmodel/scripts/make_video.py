@@ -23,6 +23,8 @@ parser.add_argument('record', type=pathlib.Path)
 parser.add_argument('out', type=pathlib.Path)
 parser.add_argument('--title', default='DreamerV3 on the Donkey Car simulator')
 parser.add_argument('--panel', type=int, nargs=2, default=(640, 480), help='width and height of one panel')
+parser.add_argument('--lead', type=int, default=0,
+                    help='steps the filmed car is ahead of its recorded position (1 for replay_views.py --drive)')
 args = parser.parse_args()
 W, H = args.panel
 S = W / 480              # the layout below is written for 480x360 panels and scaled by this
@@ -95,8 +97,11 @@ ffmpeg = subprocess.Popen([
 trail = []
 for index, row in enumerate(rows):
   canvas = Image.new('RGB', (2 * W, 2 * H), BG)
+  # With --drive the car rolls on about one step before each frame is taken, so the views filmed from the
+  # previous step's position show the car where this step's telemetry puts it.
+  filmed = rows[max(0, index - args.lead)]['frame']
 
-  panel = view('pilot', row['frame'])
+  panel = view('pilot', filmed)
   draw = ImageDraw.Draw(panel)
   label(draw, 'PILOT VIEW  (the car\'s only sensor, filmed here at higher resolution)')
   # The inset is the frame the simulator sent during the drive, resized the way the agent received it.
@@ -108,11 +113,11 @@ for index, row in enumerate(rows):
   draw.text((W - side - px(10), H - side - px(28)), 'agent input 64x64', font=SMALL, fill=FG)
   canvas.paste(panel, (0, 0))
 
-  panel = view('chase', row['frame'])
+  panel = view('chase', filmed)
   label(ImageDraw.Draw(panel), 'CHASE')
   canvas.paste(panel, (W, 0))
 
-  panel = view('overhead', row['frame'])
+  panel = view('overhead', filmed)
   if panel:
     label(ImageDraw.Draw(panel), 'HAWKEYE  (camera above the car, looking straight down)')
     canvas.paste(panel, (0, H))

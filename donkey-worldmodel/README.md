@@ -8,7 +8,8 @@ Run on 2026-11-21 on one MI350X (`asrock-1w300-f1-1`), JAX 0.12 on ROCm, simulat
 
 The run 4 agent on a simulator started after training (8 s of a 5-lap drive). The drive is recorded with the
 agent's normal camera only; the three camera views are then filmed at 512x384 by putting a car back at each
-recorded position in the same scene. Top: the car's camera position, with the 64x64 image the agent actually
+recorded position in the same scene with the recorded steering and throttle applied, so its wheels steer and
+turn. Top: the car's camera position, with the 64x64 image the agent actually
 received during the drive inset, and a chase camera. Bottom: a camera above the car, and the track centre
 line with the car's path, steering and throttle.
 
@@ -155,9 +156,11 @@ process per simulator (`--env.donkey.port_base 920x --env.donkey.length 20000 --
 
 Demo video: run one `eval_only` process with `--env.donkey.record <folder>` (saves the agent's camera
 frames, telemetry, poses and the track without touching the cameras), then
-`python scripts/replay_views.py --port <port> --record <folder>` on the same simulator before it is
+`python scripts/replay_views.py --port <port> --record <folder> --drive` on the same simulator before it is
 restarted (films pilot, chase and overhead views at 512x384 from the recorded poses, about 10 minutes).
-Copy the folder down and run `python scripts/make_video.py <folder> demo.mp4`. An earlier version filmed
+`--drive` applies the recorded controls so the wheels move; the car then rolls on about one step (0.8-1.0
+units) from each recorded position before its frame is taken, which `--lead 1` compensates for.
+Copy the folder down and run `python scripts/make_video.py <folder> demo.mp4 --lead 1`. An earlier version filmed
 two extra cameras during the drive itself; that slowed the simulator to about 6 steps/s and left small
 jumps in the recording.
 
