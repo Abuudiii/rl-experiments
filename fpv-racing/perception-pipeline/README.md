@@ -11,6 +11,7 @@ Camera frame -> gate detector (CNN) -> geometry + gate order (code) -> state est
 | `videos/split_s_unreal.mp4` | Acrobatic split-S in Unreal, flown by the pipeline, with a side view. 30 s, 41 gates (6 laps), no crash, up to 158 deg tilt. |
 | `flights_3d.mp4` | Six 3D chase panels: slalom, climb and dive, hairpin, split-S, circuit, clockwise. Pipeline flights in Unreal. |
 | `architecture.png` | Pipeline diagram with three result charts. |
+| `figures/` | The 13 figures on the model page (estimator data flow, training, tracks, results by track, noise, estimator versions, crash causes, detector, old students, split-S, Unreal by track, memory experiments). Made by `scripts/hf_figures.py` |
 | `extra/` | Detector-view clips (what the detector saw and found); split-S video with the old chase camera. |
 
 Both videos are the first flight from the fixed start (seed 900002, slot 0), not picked.

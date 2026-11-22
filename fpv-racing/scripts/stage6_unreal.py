@@ -19,6 +19,8 @@ Modes (renderer args: ``--ue '{"gpus":[0,1],"instances_per_gpu":4,"look":"stock"
   video    the published-style flight (FlightBatch ``--fb-seed`` 900002, nominal physics, slot 0) flown by the
            pipeline, rendered by `scripts/flight_video.py` (chase / FPV / overview, plain gates) + an FPV video
            with the detections drawn.
+  replay-video  the `video` outputs of a `video --record-only` flight from its flight.npz + pipeline_fpv.npz
+           (in-flight frames, detections, estimator next gate); nothing is re-flown.
   report   rebuild the per-block JSON from the per-batch records of `fly` (`fly` also writes timing_<block>.json:
            whole-chain ms per control step in Unreal mode, split into physics, render, detector, estimator + policy).
 """
@@ -1102,6 +1104,32 @@ def mode_record_video(a):
     (out / "flight.json").write_text(json.dumps(info, indent=1, default=str))
     log(json.dumps({k: info[k] for k in ("flown_by", "steps", "gates", "laps")}))
 
+
+def mode_replay_video(a):
+    """The `video` outputs of a flight flown with `video --record-only`, WITHOUT re-flying: chase / FPV / overview /
+    combined + sheet rendered from <out>/flight.npz, and the detection video from <out>/pipeline_fpv.npz (the Unreal
+    frames, detections and estimator next gate recorded in flight). Adds the video info to flight.json."""
+    import flight_video
+
+    out = Path(a.out)
+    info = json.loads((out / "flight.json").read_text())
+    rec_path = out / "flight.npz"
+    rec = flight_video.load_record(rec_path)
+    z = np.load(out / "pipeline_fpv.npz")
+    T = len(rec["pos"])
+    if len(z["frames"]) != T or info["steps"] != T:
+        raise ValueError(f"{out}: record {T} steps, pipeline_fpv {len(z['frames'])}, flight.json {info['steps']}")
+    kept = {k: z[k][None] for k in ("corners", "conf", "est_nxt")}
+    det_overlay_video(out, z["frames"], kept, dict(passed=rec["passed"][:, None], target=rec["target"][:, None]), T, 0,
+                      info["scenario"], info["pipeline"]["thr"])  # fmt: skip
+    gpus = json.loads(a.ue)["gpus"]
+    info["video"] = flight_video.make_videos([rec_path], out, ["fpv", "chase", "overview"], "grid", gpus, a.video_ipg,
+                                             "stock", sheet_name="sheet.jpg", highlight=())[0]  # fmt: skip
+    info["video_rendered"] = "after the flight from flight.npz + pipeline_fpv.npz (replay, not re-flown)"
+    (out / "flight.json").write_text(json.dumps(info, indent=1, default=str))
+    log(json.dumps({k: info[k] for k in ("scenario", "steps", "gates", "laps", "outcome")}))
+
+
 # ============================================================================ acrobatic chase camera
 def _project(cam, q, pts, W, H, hfov_deg):
     """Pinhole of `render_airsim.project_points` (mount pitch 0), broadcast over [...] -> uv [..., 2], depth [...]."""
@@ -1323,7 +1351,8 @@ def dive_sheet(out, rec, res):
 # ============================================================================ main
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("mode", choices=["bench", "frames", "labels", "detect", "fly", "report", "video", "side", "record-video", "rechase"])
+    ap.add_argument("mode", choices=["bench", "frames", "labels", "detect", "fly", "report", "video", "side", "record-video",
+                                     "replay-video", "rechase"])  # fmt: skip
     ap.add_argument("--ue", default='{"gpus":[0,1],"instances_per_gpu":2,"look":"stock"}')
     ap.add_argument("--out", required=True)
     # bench
@@ -1376,7 +1405,8 @@ def main():
 
         acro.register()
     {"bench": mode_bench, "frames": mode_frames, "labels": mode_labels, "detect": mode_detect, "fly": mode_fly,
-     "report": mode_report, "video": mode_video, "side": mode_side, "record-video": mode_record_video, "rechase": mode_rechase}[a.mode](a)  # fmt: skip
+     "report": mode_report, "video": mode_video, "side": mode_side, "record-video": mode_record_video,
+     "replay-video": mode_replay_video, "rechase": mode_rechase}[a.mode](a)  # fmt: skip
 
 
 if __name__ == "__main__":

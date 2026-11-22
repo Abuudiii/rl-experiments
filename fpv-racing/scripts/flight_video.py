@@ -238,7 +238,7 @@ def caption(rec, t):
 
 
 def annotate(img, title, text=None, font_size=15):
-    """Panel title top-left, optional caption top-right."""
+    """Panel title top-left, optional caption top-right (on a second row when the two would overlap)."""
     from PIL import Image, ImageDraw
 
     im = Image.fromarray(img)
@@ -247,7 +247,18 @@ def annotate(img, title, text=None, font_size=15):
     _tag(d, (10, 8), title, f)
     if text:
         w = d.textlength(text, font=f)
-        _tag(d, (img.shape[1] - w - 12, 8), text, f)
+        x = img.shape[1] - w - 12
+        y = 8
+        if x - 10 < 10 + d.textlength(title, font=f) + 10:  # tag boxes would touch: caption below the title
+            l, t, r, b = d.textbbox((10, 8), title, font=f)
+            y = b + 9
+            fs = font_size
+            while w > img.shape[1] - 24 and fs > 8:  # still too wide for the panel: smaller font
+                fs -= 1
+                f = _font(fs)
+                w = d.textlength(text, font=f)
+            x = img.shape[1] - w - 12
+        _tag(d, (x, y), text, f)
     return np.asarray(im)
 
 
