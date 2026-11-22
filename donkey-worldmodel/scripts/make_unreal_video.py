@@ -100,7 +100,9 @@ for index, row in enumerate(rows):
   draw = ImageDraw.Draw(panel)
   label(draw, 'PILOT VIEW  (Unreal re-render from the car\'s camera position)')
   # Exactly what the agent received: the Donkey camera frame resized to 64x64 with PIL BILINEAR.
-  donkey = Image.open(args.record / f"pilot_{row['frame']}.jpg").convert('RGB')
+  # Recordings name that frame agent_<frame>.jpg; older ones (cameras changed while driving) pilot_<frame>.jpg.
+  sent = args.record / f"agent_{row['frame']}.jpg"
+  donkey = Image.open(sent if sent.exists() else args.record / f"pilot_{row['frame']}.jpg").convert('RGB')
   agent = donkey.resize((64, 64), Image.BILINEAR).resize((128, 128), Image.NEAREST)
   x0, y0 = W - 138, H - 138
   panel.paste(agent, (x0, y0))

@@ -6,9 +6,10 @@ Run on 2026-11-21 on one MI350X (`asrock-1w300-f1-1`), JAX 0.12 on ROCm, simulat
 
 ![demo](figures/demo.gif)
 
-The run 4 agent on a simulator started after training (10 s of a 5-lap drive). Top: the car's camera, with
-the 64x64 image the agent actually receives inset, and a chase camera. Bottom: a camera above the car
-(filmed afterwards by putting a car back at each recorded position in the same scene), and the track centre
+The run 4 agent on a simulator started after training (8 s of a 5-lap drive). The drive is recorded with the
+agent's normal camera only; the three camera views are then filmed at 512x384 by putting a car back at each
+recorded position in the same scene. Top: the car's camera position, with the 64x64 image the agent actually
+received during the drive inset, and a chase camera. Bottom: a camera above the car, and the track centre
 line with the car's path, steering and throttle.
 
 ![unreal](figures/demo_unreal.gif)
@@ -152,12 +153,13 @@ process per simulator (`--env.donkey.port_base 920x --env.donkey.length 20000 --
 --env.donkey.reload_seconds 0 --env.donkey.max_cte 3.0`), then
 `python scripts/report.py runs/donkey_p3 runs/report_p3 --eval runs/donkey_p3_eval*`.
 
-Demo video: run one `eval_only` process with `--env.donkey.record <folder>` (saves both cameras at 320x240,
-telemetry, poses and the track), then `python scripts/replay_overhead.py --port <port> --record <folder>` on
-the same simulator before it is restarted (films the drive from above). Copy the folder down and run
-`python scripts/make_video.py <folder> demo.mp4`. Two 320x240 cameras slow the simulator to about 6 steps/s
-of wall time; it still sends one frame per 0.05 s of simulated time, so the drive and the video are
-unaffected.
+Demo video: run one `eval_only` process with `--env.donkey.record <folder>` (saves the agent's camera
+frames, telemetry, poses and the track without touching the cameras), then
+`python scripts/replay_views.py --port <port> --record <folder>` on the same simulator before it is
+restarted (films pilot, chase and overhead views at 512x384 from the recorded poses, about 10 minutes).
+Copy the folder down and run `python scripts/make_video.py <folder> demo.mp4`. An earlier version filmed
+two extra cameras during the drive itself; that slowed the simulator to about 6 steps/s and left small
+jumps in the recording.
 
 Unreal re-render of that folder (needs a node where Unreal renders offscreen; here 2x RTX PRO 4000 with the
 Blocks build from `../fpv-racing/scripts/setup_airsim.sh`; the AMD cards crash in Vulkan start-up):
