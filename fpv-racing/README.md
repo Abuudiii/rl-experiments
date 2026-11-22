@@ -3,13 +3,60 @@
 Goal: a network that races a quadrotor through gates from the FPV camera image alone, outputting the four stick
 commands a human pilot sends (thrust and roll / pitch / yaw rate). Everything is simulation.
 
-**Models and video:** https://huggingface.co/Abuudiii/fpv-gate-racing
+**Models and video:** https://huggingface.co/Abuudiii/fpv-gate-racing (camera student, below) and
+https://huggingface.co/Abuudiii/fpv-perception-pipeline (perception pipeline, next section)
 
 ![The student flying from its camera, with a chase view](figures/third_person.gif)
 
 Left: the student's own view in Unreal, the only thing it flies from. Bars: the sticks it commands; white tick: what
 the teacher would have done. Right: a chase camera on the same flight (the drone model is drawn at twice its true
 size; the student's view never contains it). Full videos with an overview camera are on the model page.
+
+## Perception pipeline: no green gate
+
+The camera students further down need the next gate painted green on tracks they have not seen. This version needs
+nothing painted: a CNN finds the gates in the frame, written geometry turns them into a state estimate, and a PPO
+policy flies on that estimate.
+
+![Architecture overview and results](perception-pipeline/architecture.png)
+
+| Slalom | Split-S (flies part of each lap upside down) |
+|---|---|
+| ![Slalom in Unreal](figures/slalom_pipeline.gif) | ![Split-S in Unreal](figures/split_s_pipeline.gif) |
+
+Both clips are Unreal, flown by the pipeline, first flight from a fixed start. Full videos are on the
+[model page](https://huggingface.co/Abuudiii/fpv-perception-pipeline).
+
+Three laps completed in a 30-second flight, gates shifted and physics randomised per flight:
+
+| Test | Flights | Three laps | Crashes | Lap time |
+|---|---|---|---|---|
+| Unreal, slalom | 24 | 20 of 24 (83%) | 1 | 6.71 s |
+| Unreal, split-S | 24 | 23 of 24 (96%) | 1 | 4.67 s |
+| Synthetic renderer, unseen random tracks | 2,048 | 93.8% | 4.6% | 6.14 s |
+| Synthetic renderer, six named tracks | 2,048 each | 92.5% mean (85.2% to 98.7%) | 5.9% mean | |
+
+On the same kind of unseen random tracks (256 flights) the 5-frame camera student completed three laps in 27.7% of
+flights without the green gate and about 70% with it.
+
+| Piece | File | What it does |
+|---|---|---|
+| Gate detector | `fpv/perception/detector.py`, `labels.py` | CNN, 3.9 M parameters. One 320×180 frame in, the corners of every visible gate out. Trained on frames labelled by the simulator; the teacher only flies the camera. |
+| Geometry and state estimate | `fpv/perception/`, `fpv/env_est.py` | Written code. Corners to distance and direction, next gate from the course list, speed and tilt from the gates and a simulated noisy IMU. |
+| Flight policy | `fpv/ppo_est.py`, `scripts/train_est.py` | The teacher's network retrained with PPO on noisy estimates (true corners plus a noise model of the detector; no frames rendered). |
+| Closed loop | `scripts/eval_stage5.py`, `scripts/stage6_unreal.py` | Frame, detector, estimator, policy, sticks: on the synthetic renderer and in Unreal. |
+| Split-S track | `fpv/acro.py`, `scripts/train_acro.py`, `scripts/train_est_acro.py` | A teacher rewarded for going inverted (on speed alone it banks to about 100° and does not flip), then the policy retrained on that track. |
+
+- The detector trained on synthetic frames found the next gate in 74.2% of Unreal frames; after fine-tuning on 90,000
+  labelled Unreal frames, 99.87%. The policy and estimator were not changed for Unreal.
+- The pipeline is given the course before the flight (nominal gate positions and headings, in order), not the
+  per-flight gate shifts or the drone's position.
+- The Unreal numbers are 24 flights each in one Unreal scene. The split-S uses its own policy and detector fine-tune.
+- Detector, estimator and policy take 2.2 ms per control step on an RTX PRO 4000.
+
+Everything for this result is collected in [`perception-pipeline/`](perception-pipeline/README.md). Two experiments
+that did not help are also in the code: a state-space memory layer in place of the frame stack (`fpv/student_ssm.py`)
+and a memory layer on top of it (`fpv/student_mem.py`).
 
 ## Result
 

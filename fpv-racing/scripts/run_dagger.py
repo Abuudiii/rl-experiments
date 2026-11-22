@@ -95,8 +95,23 @@ def main():
                          "teacher's training distribution, for collection and the per-round evaluation")
     ap.add_argument("--stop-at", type=float, default=None,
                     help="unix time: no new round is started that would (by the last round's duration) end after it")
+    ap.add_argument("--memory-map", action="store_true", help="disk-backed frame cache instead of resident shards")
+    ap.add_argument("--train-workers", type=int, default=4, help="host minibatch prefetch threads")
+    ap.add_argument("--fixed-eval", action="store_true", help="replay the same held-out episodes and visual seeds every round")
+    ap.add_argument("--disk-max-used-frac", type=float, default=None,
+                    help="stop before the next paired raw-shard budget would exceed this disk usage")
+    ap.add_argument("--atomic-results", action="store_true", help="replace rounds.jsonl atomically after each round")
+    ap.add_argument("--held-out-eval-dir", default=None,
+                    help="after each round, in this process: scripts/mem_eval_round.py evaluation of the new checkpoint "
+                         "(--train-scenarios layouts, randomised + nominal, wrong-gate breakdown) -> <dir>/ckpt_rNN.json")
+    ap.add_argument("--held-out-eval-seed", type=int, default=720001)
+    ap.add_argument("--held-out-eval-episodes", default="256,24", help="randomised,nominal episodes per layout")
+    ap.add_argument("--held-out-eval-steps", type=int, default=1500)
     dagger.add_student_args(ap)
     args = ap.parse_args()
+    if args.atomic_results and os.environ.get("SLURM_JOB_END_TIME"):
+        reserve_deadline = float(os.environ["SLURM_JOB_END_TIME"]) - 90 * 60
+        args.stop_at = min(args.stop_at, reserve_deadline) if args.stop_at else reserve_deadline
 
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -113,9 +128,16 @@ def main():
     elif args.init:
         cfg, params, _ = st.load_student(args.init)
         log(f"initial weights from {args.init}")
+        if args.arch == "mem" and not hasattr(cfg, "mem_width"):  # plain checkpoint + zero-output memory
+            from fpv.student_mem import from_plain
+
+            cfg, params = from_plain(cfg, params, seed=args.seed, **dagger.mem_kwargs(args))
+            log("memory student built on the plain checkpoint (memory output projection zero)")
     else:
         cfg = dagger.cfg_from_args(args)
         _, params = st.init_params(cfg, args.seed)
+    if (hasattr(cfg, "ssm_width") or hasattr(cfg, "mem_width")) and args.sequence_microbatch:
+        cfg = dataclasses.replace(cfg, sequence_microbatch=args.sequence_microbatch)
     has_student = args.init is not None or start > 0
     log(f"student: {st.n_params(params) / 1e6:.2f} M parameters, input {cfg.n_frames}x{cfg.height}x{cfg.width}")
 
@@ -149,7 +171,12 @@ def main():
         fb_s = {name: FlightBatch(r_s.n, args.teacher, seed=eval_seed, randomize=True, device=args.sim_device,
                                   scenario=name) for name in scen}  # fmt: skip
     rng = np.random.default_rng(args.seed + 17 * start)
-    data = dagger.Dataset(relabel=args.teacher if args.relabel else None)
+    if args.memory_map or hasattr(cfg, "ssm_width") or hasattr(cfg, "mem_width"):
+        from fpv.dagger_ssm_data import DiskDataset
+
+        data = DiskDataset(relabel=args.teacher if args.relabel else None)
+    else:
+        data = dagger.Dataset(relabel=args.teacher if args.relabel else None)
     for d in args.extra_data:
         data.add_dir(d, extra=True)
     for d in args.data_also:
@@ -157,7 +184,21 @@ def main():
     data.add_dir(data_dir)
 
     round_s = 0.0
+    if args.atomic_results and args.resume and rounds_path.exists():
+        round_s = json.loads(rounds_path.read_text().splitlines()[-1])["round_wall_s"]
     for r in range(start, args.rounds):
+        if args.disk_max_used_frac is not None:
+            import shutil
+
+            data_dir.mkdir(parents=True, exist_ok=True)
+            disk = shutil.disk_usage(data_dir)
+            # Two concurrent arms, retaining raw shards in-place, plus10% headroom
+            # for metadata, temporary shard writes and unrelated disk use.
+            reserve = int(2.2 * n * steps(r) * cfg.width * cfg.height * 3)
+            if disk.used + reserve > disk.total * args.disk_max_used_frac:
+                log(f"stop: round {r} paired disk reserve {reserve / 1e9:.1f}GB would exceed "
+                    f"{100 * args.disk_max_used_frac:.0f}% used; current {100 * disk.used / disk.total:.1f}%")
+                break
         if args.stop_at and time.time() + round_s > args.stop_at:
             log(f"stop: round {r} would end after --stop-at ({time.strftime('%H:%M', time.localtime(args.stop_at))}); "
                 f"last checkpoint ckpt_r{r - 1:02d}")  # fmt: skip
@@ -196,13 +237,50 @@ def main():
         lr = args.ft_lr if (r > 0 and not args.retrain and args.ft_lr) else None
         t0 = time.time()
         params, hist = dagger.train(cfg, params, data, train_steps(r), seed=args.seed + r, lr=lr, log=log,
-                                    recent_weight=args.recent_weight, extra_frac=args.extra_frac)  # fmt: skip
+                                    recent_weight=args.recent_weight, extra_frac=args.extra_frac,
+                                    workers=args.train_workers)  # fmt: skip
         has_student = True
         row.update(train_steps=train_steps(r), train_wall_s=time.time() - t0, train_mae=hist[-1]["mae"],
                    train_loss_act=hist[-1]["act"], train_loss_aux=hist[-1]["aux"])  # fmt: skip
+        if "targets" in hist[-1]:
+            row["train_targets_per_batch"] = hist[-1]["targets"]
+            import jax
+
+            row["device_memory"] = jax.devices()[0].memory_stats()
         st.save_student(out / f"ckpt_r{r:02d}.pkl", params, cfg, dict(round=r))
         st.save_student(out / "ckpt_latest.pkl", params, cfg, dict(round=r))
+        if args.held_out_eval_dir:
+            import importlib.util
+
+            spec = importlib.util.spec_from_file_location("mem_eval_round", ROOT / "scripts" / "mem_eval_round.py")
+            mer = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mer)
+            dagger.check_held_out(args.held_out_eval_seed, [*args.data_also, data_dir])
+            n_rand, n_nom = (int(v) for v in args.held_out_eval_episodes.split(","))
+            t0 = time.time()
+            res = dict(checkpoint=str(out / f"ckpt_r{r:02d}.pkl"), round=r, seed=args.held_out_eval_seed,
+                       steps=args.held_out_eval_steps, parameters=st.n_params(params),
+                       arch="mem" if hasattr(cfg, "mem_width") else "cnn")  # fmt: skip
+            res["layouts"] = mer.eval_policy(cfg, params, args.teacher, train_layouts, n_rand, n_nom,
+                                             args.held_out_eval_steps, args.held_out_eval_seed, log, name=f"r{r:02d}")  # fmt: skip
+            res["wall_s"] = time.time() - t0
+            row["held_out_eval_wall_s"] = res["wall_s"]
+            mer.write_json(Path(args.held_out_eval_dir) / f"ckpt_r{r:02d}.json", res)
         # 3. student-only evaluation
+        if args.fixed_eval:
+            fb_eval = dagger.make_flights(n, args.teacher, eval_seed, train_layouts, randomize=True, device=args.sim_device)
+            renderer.close()
+            renderer = dagger.make_renderer(args.renderer, n, cfg.width, cfg.height,
+                                              seed=eval_seed, **json.loads(args.renderer_args))
+            if scen:
+                if r_s is not renderer:
+                    r_s.close()
+                r_s = renderer if args.renderer != "synth" else dagger.make_renderer(
+                    "synth", min(args.scenario_episodes, n), cfg.width, cfg.height,
+                    seed=eval_seed + 7, **json.loads(args.renderer_args))
+                fb_s = {name: FlightBatch(r_s.n, args.teacher, seed=eval_seed, randomize=True,
+                                         device=args.sim_device, scenario=name) for name in scen}
+        eval_rng = np.random.default_rng(eval_seed) if args.fixed_eval else rng
         runner = st.StudentRunner(cfg, params, n)
         eps, ev = [], dict(frames_rendered=0, render_s=0.0, wall_s=0.0)
         writer = dagger.ShardWriter(data_dir, r + 1, seed=eval_seed, kind="round_eval", teacher=args.teacher,
@@ -210,7 +288,7 @@ def main():
                                     renderer=args.renderer, highlight_target=dagger.highlight_on(renderer)
                                     ) if args.eval_as_data else None  # fmt: skip
         while len(eps) < args.eval_episodes:
-            _, e, info = dagger.evaluate(fb_eval, renderer, runner, steps=args.eval_steps, rng=rng, writer=writer, log=log)
+            _, e, info = dagger.evaluate(fb_eval, renderer, runner, steps=args.eval_steps, rng=eval_rng, writer=writer, log=log)
             eps += e
             for k in ev:
                 ev[k] += info[k]
@@ -221,20 +299,37 @@ def main():
             t0, row["eval_scenarios"] = time.time(), {}
             runner_s = runner if r_s is renderer else st.StudentRunner(cfg, params, r_s.n)
             for name, fbs in fb_s.items():  # held out: never written
+                scenario_rng = np.random.default_rng(eval_seed) if args.fixed_eval else rng
                 se = []
                 while len(se) < args.scenario_episodes:
-                    se += dagger.evaluate(fbs, r_s, runner_s, steps=args.eval_steps, rng=rng)[1]
+                    se += dagger.evaluate(fbs, r_s, runner_s, steps=args.eval_steps, rng=scenario_rng)[1]
                 row["eval_scenarios"][name] = dagger.summarize(se[: args.scenario_episodes])
             row["eval_scenarios_wall_s"] = time.time() - t0
             log(f"round {r}: scenarios 3 laps " + "  ".join(
                 f"{k} {v['frac_3_laps']:.3f}" for k, v in row["eval_scenarios"].items()))  # fmt: skip
+        if args.fixed_eval:
+            renderer.close()
+            if scen and r_s is not renderer:
+                r_s.close()
+            renderer = dagger.make_renderer(args.renderer, n, cfg.width, cfg.height,
+                                              seed=args.seed + r + 1, **json.loads(args.renderer_args))
         round_s = time.time() - t_round
         row["round_wall_s"] = round_s
-        dagger.append_jsonl(rounds_path, row)
-        log(f"round {r}: EVAL 1 lap {m['frac_1_lap']:.3f}  3 laps {m['frac_3_laps']:.3f}  no crash "
-            f"{m['frac_full_episode_no_crash']:.3f}  gates/ep {m['gates_per_episode']:.1f}  crashes {m['crash_rate_by_cause']} "
-            f"lap {m['lap_time_s']}  mae {m.get('action_mae_vs_teacher', float('nan')):.4f}  "
-            f"({ev['frames_rendered']} frames, {ev['wall_s']:.0f} s)")  # fmt: skip
+        if args.atomic_results:
+            previous = rounds_path.read_bytes() if rounds_path.exists() else b""
+            temporary = rounds_path.with_suffix(".tmp")
+            with temporary.open("wb") as output:
+                output.write(previous + (json.dumps(row) + "\n").encode())
+                output.flush()
+                os.fsync(output.fileno())
+            temporary.replace(rounds_path)
+        else:
+            dagger.append_jsonl(rounds_path, row)
+        if m["episodes"]:  # --eval-episodes 0: no in-loop evaluation (e.g. a separate evaluator per checkpoint)
+            log(f"round {r}: EVAL 1 lap {m['frac_1_lap']:.3f}  3 laps {m['frac_3_laps']:.3f}  no crash "
+                f"{m['frac_full_episode_no_crash']:.3f}  gates/ep {m['gates_per_episode']:.1f}  crashes {m['crash_rate_by_cause']} "
+                f"lap {m['lap_time_s']}  mae {m.get('action_mae_vs_teacher', float('nan')):.4f}  "
+                f"({ev['frames_rendered']} frames, {ev['wall_s']:.0f} s)")  # fmt: skip
     renderer.close()
     if scen and r_s is not renderer:
         r_s.close()

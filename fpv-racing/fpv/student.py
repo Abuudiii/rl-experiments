@@ -70,6 +70,14 @@ class StudentNet(nn.Module):
 
 
 def init_params(cfg: StudentConfig, seed: int = 0):
+    if hasattr(cfg, "mem_width"):
+        from fpv.student_mem import init_params as init_mem
+
+        return init_mem(cfg, seed)
+    if hasattr(cfg, "ssm_width"):
+        from fpv.student_ssm import init_params as init_ssm
+
+        return init_ssm(cfg, seed)
     net = StudentNet(cfg)
     params = net.init(jax.random.key(seed), jnp.zeros((1, cfg.n_frames, cfg.height, cfg.width, 3)), jnp.zeros((1, 4)))
     return net, params
@@ -157,12 +165,32 @@ def load_student(path):
     c = dict(ckpt["config"])
     for k in ("channels", "hidden"):
         c[k] = tuple(c[k])
-    cfg = StudentConfig(**c)
+    if "mem_width" in c:
+        from fpv.student_mem import MemConfig
+
+        cfg = MemConfig(**c)
+    elif "ssm_width" in c:
+        from fpv.student_ssm import SsmConfig
+
+        cfg = SsmConfig(**c)
+    else:
+        cfg = StudentConfig(**c)
     return cfg, jax.tree_util.tree_map(jnp.asarray, ckpt["params"]), ckpt
 
 
 class StudentRunner:
     """Closed-loop inference for n parallel episodes; keeps the frame history on the device."""
+
+    def __new__(cls, cfg, params, n):
+        if hasattr(cfg, "mem_width"):
+            from fpv.student_mem import StudentRunner as MemRunner
+
+            return MemRunner(cfg, params, n)
+        if hasattr(cfg, "ssm_width"):
+            from fpv.student_ssm import StudentRunner as SsmRunner
+
+            return SsmRunner(cfg, params, n)
+        return super().__new__(cls)
 
     def __init__(self, cfg: StudentConfig, params, n: int):
         self.cfg, self.params, self.n = cfg, params, n

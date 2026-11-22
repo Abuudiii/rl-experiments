@@ -350,6 +350,16 @@ def train(cfg: st.StudentConfig, params, data: Dataset, steps: int, seed: int = 
     """Train / fine-tune ``params`` on the aggregated data for ``steps`` batches. recent_weight > 1
     samples frames of the newest round that many times more often than the others; data marked
     ``extra`` (another renderer) make up ``extra_frac`` of every batch."""
+    if hasattr(cfg, "mem_width"):
+        from fpv.student_mem import train as train_mem
+
+        return train_mem(cfg, params, data, steps, seed=seed, lr=lr, log=log, log_every=log_every,
+                         recent_weight=recent_weight, extra_frac=extra_frac, workers=workers)
+    if hasattr(cfg, "ssm_width"):
+        from fpv.student_ssm import train as train_ssm
+
+        return train_ssm(cfg, params, data, steps, seed=seed, lr=lr, log=log, log_every=log_every,
+                         recent_weight=recent_weight, extra_frac=extra_frac, workers=workers)
     opt, step, _ = st.make_train_step(cfg, steps, lr=lr)
     opt_state = opt.init(params)
     own = [b for b in data.blocks if not b.extra]
@@ -642,6 +652,22 @@ def log(m: str):
 
 
 def add_student_args(ap):
+    ap.add_argument("--arch", choices=("cnn", "ssm", "mem"), default="cnn",
+                    help="camera policy architecture (mem: frame-stack CNN + residual memory, fpv.student_mem)")
+    ap.add_argument("--mem-width", type=int, default=128, help="mem: recurrent channels")
+    ap.add_argument("--mem-state", type=int, default=16, help="mem: diagonal states per channel")
+    ap.add_argument("--gate-head", action="store_true", help="mem: auxiliary next-gate-index head on the memory")
+    ap.add_argument("--gate-weight", type=float, default=0.1, help="mem: weight of the next-gate cross-entropy")
+    ap.add_argument("--sequence-length", type=int, default=32, help="SSM supervised suffix length")
+    ap.add_argument("--burn-in", type=int, default=16, help="SSM loss-masked memory prefix")
+    ap.add_argument("--sequence-batch", type=int, default=8, help="SSM chunks per optimizer step")
+    ap.add_argument("--ssm-input-frames", type=int, choices=(1, 2), default=1,
+                    help="SSM encoder frames per step (packed previous,current for2)")
+    ap.add_argument("--sequence-microbatch", type=int, default=0,
+                    help="SSM sequences per compiled gradient (0 disables accumulation; effective batch unchanged)")
+    ap.add_argument("--ssm-width", type=int, default=256)
+    ap.add_argument("--ssm-state", type=int, default=16)
+    ap.add_argument("--ssm-layers", type=int, default=1)
     ap.add_argument("--width", type=int, default=160)
     ap.add_argument("--height", type=int, default=90)
     ap.add_argument("--frames", type=int, default=3, help="frame history length")
@@ -654,6 +680,34 @@ def add_student_args(ap):
 
 
 def cfg_from_args(args) -> st.StudentConfig:
+    if args.arch == "mem":
+        import dataclasses
+
+        from fpv.student_mem import MemConfig
+
+        return MemConfig(**dataclasses.asdict(_base_cfg_from_args(args)), **mem_kwargs(args))
+    return _base_cfg_from_args(args)
+
+
+def mem_kwargs(args) -> dict:
+    """MemConfig fields given on the command line (also used to turn a plain checkpoint into a memory student)."""
+    return dict(mem_width=args.mem_width, mem_state=args.mem_state, gate_head=args.gate_head,
+                gate_weight=args.gate_weight, sequence_length=args.sequence_length, burn_in=args.burn_in,
+                sequence_batch=args.sequence_batch, sequence_microbatch=args.sequence_microbatch)
+
+
+def _base_cfg_from_args(args) -> st.StudentConfig:
+    if args.arch == "ssm":
+        from fpv.student_ssm import SsmConfig
+
+        return SsmConfig(width=args.width, height=args.height, n_frames=args.ssm_input_frames,
+                         use_prev_action=not args.no_prev_action,
+                         aux_weight=args.aux_weight, lr=args.lr, batch=args.batch,
+                         channels=tuple(int(c) for c in args.channels.split(",")),
+                         prev_action_drop=args.prev_action_drop, sequence_length=args.sequence_length,
+                         burn_in=args.burn_in, sequence_batch=args.sequence_batch,
+                         sequence_microbatch=args.sequence_microbatch,
+                         ssm_width=args.ssm_width, ssm_state=args.ssm_state, ssm_layers=args.ssm_layers)
     return st.StudentConfig(
         width=args.width, height=args.height, n_frames=args.frames, use_prev_action=not args.no_prev_action,
         aux_weight=args.aux_weight, lr=args.lr, batch=args.batch,
@@ -663,6 +717,14 @@ def cfg_from_args(args) -> st.StudentConfig:
 
 def inference_speed(cfg: st.StudentConfig, params, batches=(1, 64), reps: int = 200) -> dict:
     """Wall time of one forward pass (frames already on the device), per batch size."""
+    if hasattr(cfg, "mem_width"):
+        from fpv.student_mem import inference_speed as speed_mem
+
+        return speed_mem(cfg, params, batches=batches, reps=reps)
+    if hasattr(cfg, "ssm_width"):
+        from fpv.student_ssm import inference_speed as speed_ssm
+
+        return speed_ssm(cfg, params, batches=batches, reps=reps)
     import jax.numpy as jnp
 
     net = st.StudentNet(cfg)
