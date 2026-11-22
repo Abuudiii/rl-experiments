@@ -11,6 +11,13 @@ the 64x64 image the agent actually receives inset, and a chase camera. Bottom: a
 (filmed afterwards by putting a car back at each recorded position in the same scene), and the track centre
 line with the car's path, steering and throttle.
 
+![unreal](figures/demo_unreal.gif)
+
+The same recorded drive re-rendered in Unreal (Project AirSim Blocks) for clearer visuals. This is a replay
+of the recorded poses on a rebuilt copy of the track: the agent never saw these images, and the inset shows
+the real 64x64 Donkey frame it drove from. The hawkeye view is a fixed camera above the whole track, turned
+90 degrees relative to the map panel. Scenery, lighting and the car model are not the Donkey simulator's.
+
 ![dream](figures/dream.gif)
 
 The world model, 64x64. Each column is one stretch of driving: real frames, the model's prediction, and the
@@ -151,6 +158,15 @@ the same simulator before it is restarted (films the drive from above). Copy the
 `python scripts/make_video.py <folder> demo.mp4`. Two 320x240 cameras slow the simulator to about 6 steps/s
 of wall time; it still sends one frame per 0.05 s of simulated time, so the drive and the video are
 unaffected.
+
+Unreal re-render of that folder (needs a node where Unreal renders offscreen; here 2x RTX PRO 4000 with the
+Blocks build from `../fpv-racing/scripts/setup_airsim.sh`; the AMD cards crash in Vulkan start-up):
+`scripts/unreal_render.py --record <folder> --out <frames> --instances 3 --gpus 0,1` on the node, copy the
+frames down, then `scripts/make_unreal_video.py <folder> <frames> demo_unreal.mp4`. The track is built from
+the 108 centre-line points at 1 Donkey unit = 1 m. Road geometry, measured from the simulator source and
+confirmed on the overhead frames to about 0.1 units: 10 wide, its middle 2 to the left of the centre-line
+path, white lines 4.05 either side of the middle, yellow line on the middle. It reuses the model builders,
+simulator launch and lock-step capture of `../fpv-racing/fpv/render_airsim.py`. About 90 frames/s per view.
 
 ## Things that had to be worked around
 
