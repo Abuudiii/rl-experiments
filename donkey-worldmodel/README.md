@@ -4,12 +4,17 @@ A simulated Donkey Car learns to lap `generated-track` from its 64x64 front came
 (world model trained on real simulator steps, actor and critic trained on imagined rollouts).
 Run on 2026-11-21 on one MI350X (`asrock-1w300-f1-1`), JAX 0.12 on ROCm, simulators rendering on the CPU.
 
-| The trained car's own view (run 2) | World model: real frames, predicted frames, difference |
-|---|---|
-| ![driving](figures/drive_after.gif) | ![dream](figures/dream.gif) |
+![demo](figures/demo.gif)
 
-In the right-hand clip each column is one stretch of driving. The model sees the first half and imagines the
-second half from the actions alone; it keeps the road shape and loses detail in the trees.
+The run 2 agent on a simulator started after training (first 12 s of a 5-lap drive). Top: the car's camera,
+with the 64x64 image the agent actually receives inset, and a chase camera. Bottom: the track centre line with
+the car's path, and the agent's steering and throttle.
+
+![dream](figures/dream.gif)
+
+The world model, 64x64. Each column is one stretch of driving: real frames, the model's prediction, and the
+difference. The model sees the first half and imagines the second half from the actions alone; it keeps the
+road shape and loses detail in the trees.
 
 ## Result: run 2 (`donkey_p1`, seed 0, 300k steps, 8 cars, about 46 minutes of wall time)
 
@@ -101,6 +106,11 @@ Evaluate on simulators restarted after training, with one `--script eval_only --
 process per simulator (`--env.donkey.port_base 920x --env.donkey.length 20000 --env.donkey.max_laps 10
 --env.donkey.reload_seconds 0`), then
 `python scripts/report.py runs/donkey_p1 runs/report_p1 --eval runs/donkey_p1_eval*`.
+
+Demo video: run one `eval_only` process with `--env.donkey.record <folder>` (saves both cameras at 320x240,
+telemetry and the track), copy the folder down, then `python scripts/make_video.py <folder> demo.mp4`.
+Two 320x240 cameras slow the simulator to about 6 steps/s of wall time; it still sends one frame per 0.05 s
+of simulated time, so the drive and the video are unaffected.
 
 ## Things that had to be worked around
 

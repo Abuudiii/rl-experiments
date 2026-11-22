@@ -12,7 +12,8 @@ class Donkey(embodied.Env):
   def __init__(
       self, task, index=0, size=(64, 64), length=2000, max_laps=0,
       port_base=9200, host='127.0.0.1', max_cte=4.0,
-      throttle_min=0.2, throttle_max=0.6, stall_steps=200, reload_seconds=0):
+      throttle_min=0.2, throttle_max=0.6, stall_steps=200, reload_seconds=0,
+      record=''):
     self._id = f'donkey-{task}-v0'
     self._conf = dict(
         host=host, port=int(port_base) + int(index), max_cte=float(max_cte),
@@ -25,6 +26,9 @@ class Donkey(embodied.Env):
     self._max_cte = float(max_cte)
     self._reload_seconds = float(reload_seconds)
     self._loaded_at = None
+    self._record = record     # folder for demo-video material, or '' for none
+    self._recorder = None
+    self._action = np.zeros(2, np.float32)
     self._low = np.array([-1.0, throttle_min], np.float32)
     self._high = np.array([1.0, throttle_max], np.float32)
     self._env = None
@@ -78,6 +82,10 @@ class Donkey(embodied.Env):
     handler.fns['telemetry'] = telemetry
     self._handler = handler
     self._loaded_at = time.time()
+    if self._record:
+      from . import donkey_record
+      frame, _ = self._env.reset()   # telemetry must be flowing before the track size is known
+      self._recorder = donkey_record.Recorder(handler, self._record)
 
   def _reload(self):
     """Load the scene again; the sim then regenerates trees, cones and lighting."""
@@ -115,8 +123,8 @@ class Donkey(embodied.Env):
       self._node = self._handler.active_node
       self._time = time.time()
       return self._obs(frame, 0.0, info, 0.0, is_first=True)
-    frame, _, over, _, info = self._env.step(
-        np.asarray(action['action'], np.float32))
+    self._action = np.asarray(action['action'], np.float32)
+    frame, _, over, _, info = self._env.step(self._action)
     total = self._handler.total_nodes
     delta = (self._handler.active_node - self._node) % total
     if delta > total / 2:
@@ -147,7 +155,7 @@ class Donkey(embodied.Env):
     image = np.asarray(Image.fromarray(frame).resize(
         self._size[::-1], Image.BILINEAR), np.uint8)
     laps = self._progress / max(1, self._handler.total_nodes)
-    return {
+    obs = {
         'image': image,
         'reward': np.float32(reward),
         'is_first': is_first,
@@ -162,6 +170,12 @@ class Donkey(embodied.Env):
         'log/speed': np.float32(info['speed']),
         'log/dt': np.float32(dt),
     }
+    if self._recorder:
+      self._recorder.write(dict(
+          x=info['pos'][0], z=info['pos'][2], cte=info['cte'], speed=info['speed'],
+          steer=float(self._action[0]), throttle=float(self._action[1]), laps=float(laps),
+          sim_laps=info['lap_count'], first=is_first, last=is_last, terminal=is_terminal))
+    return obs
 
   def close(self):
     if self._env is not None:

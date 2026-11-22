@@ -15,7 +15,7 @@ fi
 # Always rebuild the tree from the pinned commit plus our patch, so an updated patch takes effect.
 git -C dreamerv3 checkout -q -f $DREAMER_SHA
 git -C dreamerv3 apply "$ROOT/patches/dreamerv3.patch"
-cp envs/donkey.py dreamerv3/embodied/envs/donkey.py
+cp envs/*.py dreamerv3/embodied/envs/
 
 if [ ! -x .venv/bin/python ]; then
   $UV venv -p /usr/bin/python3.12 .venv

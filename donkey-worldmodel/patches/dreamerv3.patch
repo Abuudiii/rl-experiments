@@ -1,5 +1,5 @@
 diff --git i/dreamerv3/configs.yaml w/dreamerv3/configs.yaml
-index 786b67e..bda17f5 100644
+index 786b67e..2e7198b 100644
 --- i/dreamerv3/configs.yaml
 +++ w/dreamerv3/configs.yaml
 @@ -35,6 +35,8 @@ defaults:
@@ -7,7 +7,7 @@ index 786b67e..bda17f5 100644
      dmc: {size: [64, 64], repeat: 1, proprio: True, image: True, camera: -1}
      loconav: {size: [64, 64], repeat: 1, camera: -1}
 +    # Every sim also tries to bind its private API on 9092, and the nodes run services on 9100-9110.
-+    donkey: {size: [64, 64], length: 2000, max_laps: 0, port_base: 9200, host: '127.0.0.1', max_cte: 3.0, throttle_min: 0.2, throttle_max: 0.6, stall_steps: 200, reload_seconds: 0}
++    donkey: {size: [64, 64], length: 2000, max_laps: 0, port_base: 9200, host: '127.0.0.1', max_cte: 3.0, throttle_min: 0.2, throttle_max: 0.6, stall_steps: 200, reload_seconds: 0, record: ''}
  
    replay:
      size: 5e6
